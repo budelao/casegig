@@ -39,7 +39,7 @@ public sealed class CriarOrdemAgendadaUseCase
     public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemAgendamentoRequestDto request, DateTime agora, CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "Executando caso de uso: criar ordem agendada. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas} DataAgendamento={DataAgendamento}",
+            "API: Executando caso de uso: criar ordem agendada. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas} DataAgendamento={DataAgendamento}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
@@ -85,7 +85,7 @@ public sealed class CriarOrdemAgendadaUseCase
                 ordem.DataProcessamento);
         }, cancellationToken);
 
-        _logger.LogInformation("Ordem agendada criada. Ordem={IdOrdem} Status={Status} DataAgendamento={DataAgendamento}", result!.IdOrdem, result!.Status, result!.DataAgendamento);
+        _logger.LogInformation("API: Ordem agendada criada. Ordem={IdOrdem} Status={Status} DataAgendamento={DataAgendamento}", result!.IdOrdem, result!.Status, result!.DataAgendamento);
         return result!;
     }
 }

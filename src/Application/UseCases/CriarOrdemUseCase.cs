@@ -42,7 +42,7 @@ public sealed class CriarOrdemUseCase
     public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemRequestDto request, DateTime agora, CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "Executando caso de uso: criar ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
+            "API: Executando caso de uso: criar ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
@@ -108,7 +108,7 @@ public sealed class CriarOrdemUseCase
                 ordem.DataProcessamento);
         }, cancellationToken);
 
-        _logger.LogInformation("Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
+        _logger.LogInformation("API: Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
         return result!;
     }
 
