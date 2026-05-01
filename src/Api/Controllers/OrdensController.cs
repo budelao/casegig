@@ -39,7 +39,7 @@ public sealed class OrdensController : ControllerBase
         if (errors.Count > 0)
         {
             _logger.LogWarning(
-                "Falha de validação no request de criação de ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} ErrorsCount={ErrorsCount}",
+                "API: Falha de validação no request de criação de ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} ErrorsCount={ErrorsCount}",
                 request.IdCliente,
                 request.IdFundo,
                 request.TipoOperacao,
@@ -48,7 +48,7 @@ public sealed class OrdensController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Criando ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
+            "API: Criando ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
@@ -76,7 +76,7 @@ public sealed class OrdensController : ControllerBase
         if (errors.Count > 0)
         {
             _logger.LogWarning(
-                "Falha de validação no request de criação de ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} DataAgendamento={DataAgendamento} ErrorsCount={ErrorsCount}",
+                "API: Falha de validação no request de criação de ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} DataAgendamento={DataAgendamento} ErrorsCount={ErrorsCount}",
                 request.IdCliente,
                 request.IdFundo,
                 request.TipoOperacao,
@@ -86,7 +86,7 @@ public sealed class OrdensController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Criando ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} Data={DataAgendamento}",
+            "API: Criando ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} Data={DataAgendamento}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
