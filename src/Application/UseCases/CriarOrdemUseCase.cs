@@ -4,11 +4,13 @@ using CaseGig.Application.Exceptions;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using CaseGig.Domain.Services;
+using Microsoft.Extensions.Logging;
 
 namespace CaseGig.Application.UseCases;
 
 public sealed class CriarOrdemUseCase
 {
+    private readonly ILogger<CriarOrdemUseCase> _logger;
     private readonly ITransactionManager _transactionManager;
     private readonly IClienteRepository _clienteRepository;
     private readonly IFundoRepository _fundoRepository;
@@ -18,6 +20,7 @@ public sealed class CriarOrdemUseCase
     private readonly OrdemProcessamentoService _processamentoService;
 
     public CriarOrdemUseCase(
+        ILogger<CriarOrdemUseCase> logger,
         ITransactionManager transactionManager,
         IClienteRepository clienteRepository,
         IFundoRepository fundoRepository,
@@ -26,6 +29,7 @@ public sealed class CriarOrdemUseCase
         OrdemService ordemService,
         OrdemProcessamentoService processamentoService)
     {
+        _logger = logger;
         _transactionManager = transactionManager;
         _clienteRepository = clienteRepository;
         _fundoRepository = fundoRepository;
@@ -37,6 +41,13 @@ public sealed class CriarOrdemUseCase
 
     public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemRequestDto request, DateTime agora, CancellationToken cancellationToken)
     {
+        _logger.LogInformation(
+            "Executando caso de uso: criar ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
+            request.IdCliente,
+            request.IdFundo,
+            request.TipoOperacao,
+            request.QuantidadeCotas);
+
         CriarOrdemResultDto? result = null;
 
         await _transactionManager.ExecuteAsync(async ct =>
@@ -97,6 +108,7 @@ public sealed class CriarOrdemUseCase
                 ordem.DataProcessamento);
         }, cancellationToken);
 
+        _logger.LogInformation("Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
         return result!;
     }
 

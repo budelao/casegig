@@ -38,6 +38,12 @@ public sealed class OrdensController : ControllerBase
         var errors = ValidarCriarOrdemRequest(request);
         if (errors.Count > 0)
         {
+            _logger.LogWarning(
+                "Falha de validação no request de criação de ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} ErrorsCount={ErrorsCount}",
+                request.IdCliente,
+                request.IdFundo,
+                request.TipoOperacao,
+                errors.Count);
             return BadRequest(ApiResponse<object>.Fail(errors.ToArray()));
         }
 
@@ -69,6 +75,13 @@ public sealed class OrdensController : ControllerBase
         var errors = ValidarCriarOrdemAgendadaRequest(request);
         if (errors.Count > 0)
         {
+            _logger.LogWarning(
+                "Falha de validação no request de criação de ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} DataAgendamento={DataAgendamento} ErrorsCount={ErrorsCount}",
+                request.IdCliente,
+                request.IdFundo,
+                request.TipoOperacao,
+                request.DataAgendamento,
+                errors.Count);
             return BadRequest(ApiResponse<object>.Fail(errors.ToArray()));
         }
 
@@ -77,14 +90,14 @@ public sealed class OrdensController : ControllerBase
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
-            request.DataAgendamento.Date);
+            request.DataAgendamento);
 
         var dto = new CriarOrdemAgendamentoRequestDto(
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
             request.QuantidadeCotas,
-            request.DataAgendamento.Date);
+            request.DataAgendamento);
 
         var result = await _criarOrdemAgendadaUseCase.ExecuteAsync(dto, DateTime.Now, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, ApiResponse<CriarOrdemResultDto>.Ok(result));
@@ -139,7 +152,8 @@ public sealed class OrdensController : ControllerBase
             errors.Add("QuantidadeCotas é obrigatória e deve ser maior que zero.");
         }
 
-        if (request.DataAgendamento.Date <= DateTime.Today)
+        var hoje = DateOnly.FromDateTime(DateTime.Today);
+        if (request.DataAgendamento <= hoje)
         {
             errors.Add("DataAgendamento deve ser futura (D+1 ou adiante).");
         }

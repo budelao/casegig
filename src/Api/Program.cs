@@ -7,14 +7,45 @@ using CaseGig.Infrastructure;
 using CaseGig.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Models;
+using System.Globalization;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
+Console.OutputEncoding = Encoding.UTF8;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole(options =>
+{
+    options.FormatterName = ColoredJsonConsoleFormatter.FormatterName;
+});
+
+builder.Logging.AddConsoleFormatter<ColoredJsonConsoleFormatter, ColoredJsonConsoleFormatterOptions>(options =>
+{
+    options.IncludeScopes = true;
+    options.JsonWriterOptions = new JsonWriterOptions
+    {
+        Indented = false,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+    options.WorkerColor = ConsoleColor.DarkYellow;
+    options.ApiColor = ConsoleColor.DarkGreen;
+});
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new DateOnlyDdMmYyyyJsonConverter());
     });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -31,7 +62,15 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.MapType<DateOnly>(() => new OpenApiSchema
+    {
+        Type = "string",
+        Pattern = "^\\d{2}/\\d{2}/\\d{4}$",
+        Example = new OpenApiString("31/12/2026")
+    });
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -69,3 +108,174 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+sealed class ColoredJsonConsoleFormatterOptions : ConsoleFormatterOptions
+{
+    public ConsoleColor WorkerColor { get; set; } = ConsoleColor.DarkYellow;
+    public ConsoleColor ApiColor { get; set; } = ConsoleColor.DarkGreen;
+    public bool UseColors { get; set; } = true;
+    public JsonWriterOptions JsonWriterOptions { get; set; } = new()
+    {
+        Indented = false,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+}
+
+sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
+{
+    public const string FormatterName = "coloredJson";
+    private static readonly object ConsoleLock = new();
+    private readonly ColoredJsonConsoleFormatterOptions _options;
+
+    public ColoredJsonConsoleFormatter(IOptionsMonitor<ColoredJsonConsoleFormatterOptions> options)
+        : base(FormatterName)
+    {
+        _options = options.CurrentValue;
+    }
+
+    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter)
+    {
+        var message = logEntry.Formatter?.Invoke(logEntry.State, logEntry.Exception);
+        var prefix = GetPrefix(logEntry.Category);
+        if (!string.IsNullOrWhiteSpace(prefix) && !string.IsNullOrWhiteSpace(message))
+        {
+            message = $"{prefix} {message}";
+        }
+
+        Dictionary<string, object?>? state = null;
+        if (logEntry.State is IEnumerable<KeyValuePair<string, object?>> stateValues)
+        {
+            state = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var kvp in stateValues)
+            {
+                state[kvp.Key] = kvp.Value;
+            }
+        }
+
+        List<object?>? scopes = null;
+        if (_options.IncludeScopes && scopeProvider is not null)
+        {
+            scopes = new List<object?>();
+            scopeProvider.ForEachScope(
+                static (scope, list) =>
+                {
+                    if (scope is IEnumerable<KeyValuePair<string, object?>> scopeValues)
+                    {
+                        var scopeDict = new Dictionary<string, object?>(StringComparer.Ordinal);
+                        foreach (var kvp in scopeValues)
+                        {
+                            scopeDict[kvp.Key] = kvp.Value;
+                        }
+                        list.Add(scopeDict);
+                        return;
+                    }
+
+                    list.Add(scope?.ToString());
+                },
+                scopes);
+        }
+
+        var payload = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["EventId"] = logEntry.EventId.Id,
+            ["LogLevel"] = logEntry.LogLevel.ToString(),
+            ["Category"] = logEntry.Category,
+            ["Message"] = message,
+            ["State"] = state,
+            ["Scopes"] = scopes
+        };
+
+        if (logEntry.Exception is not null)
+        {
+            payload["Exception"] = logEntry.Exception.ToString();
+        }
+
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            Encoder = _options.JsonWriterOptions.Encoder ?? JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        if (!_options.UseColors)
+        {
+            textWriter.WriteLine(json);
+            return;
+        }
+
+        var color = GetColor(logEntry.Category);
+
+        lock (ConsoleLock)
+        {
+            var originalColor = Console.ForegroundColor;
+            try
+            {
+                Console.ForegroundColor = color;
+                textWriter.WriteLine(json);
+            }
+            finally
+            {
+                Console.ForegroundColor = originalColor;
+            }
+        }
+    }
+
+    private ConsoleColor GetColor(string category)
+    {
+        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+        {
+            return _options.WorkerColor;
+        }
+
+        if (category.StartsWith("CaseGig.Api", StringComparison.Ordinal))
+        {
+            return _options.ApiColor;
+        }
+
+        return Console.ForegroundColor;
+    }
+
+    private static string? GetPrefix(string category)
+    {
+        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+        {
+            return "WORKER:";
+        }
+
+        if (category.StartsWith("CaseGig.Api", StringComparison.Ordinal))
+        {
+            return "API:";
+        }
+
+        return null;
+    }
+}
+
+sealed class DateOnlyDdMmYyyyJsonConverter : JsonConverter<DateOnly>
+{
+    private const string Format = "dd/MM/yyyy";
+
+    public override DateOnly Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new JsonException($"Data inválida. Formato esperado: {Format}");
+        }
+
+        var value = reader.GetString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new JsonException($"Data inválida. Formato esperado: {Format}");
+        }
+
+        if (!DateOnly.TryParseExact(value, Format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            throw new JsonException($"Data inválida. Formato esperado: {Format}");
+        }
+
+        return date;
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateOnly value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString(Format, CultureInfo.InvariantCulture));
+    }
+}

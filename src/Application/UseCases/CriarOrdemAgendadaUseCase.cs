@@ -4,11 +4,13 @@ using CaseGig.Application.Exceptions;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using CaseGig.Domain.Services;
+using Microsoft.Extensions.Logging;
 
 namespace CaseGig.Application.UseCases;
 
 public sealed class CriarOrdemAgendadaUseCase
 {
+    private readonly ILogger<CriarOrdemAgendadaUseCase> _logger;
     private readonly ITransactionManager _transactionManager;
     private readonly IClienteRepository _clienteRepository;
     private readonly IFundoRepository _fundoRepository;
@@ -17,6 +19,7 @@ public sealed class CriarOrdemAgendadaUseCase
     private readonly OrdemService _ordemService;
 
     public CriarOrdemAgendadaUseCase(
+        ILogger<CriarOrdemAgendadaUseCase> logger,
         ITransactionManager transactionManager,
         IClienteRepository clienteRepository,
         IFundoRepository fundoRepository,
@@ -24,6 +27,7 @@ public sealed class CriarOrdemAgendadaUseCase
         IOrdemRepository ordemRepository,
         OrdemService ordemService)
     {
+        _logger = logger;
         _transactionManager = transactionManager;
         _clienteRepository = clienteRepository;
         _fundoRepository = fundoRepository;
@@ -34,6 +38,14 @@ public sealed class CriarOrdemAgendadaUseCase
 
     public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemAgendamentoRequestDto request, DateTime agora, CancellationToken cancellationToken)
     {
+        _logger.LogInformation(
+            "Executando caso de uso: criar ordem agendada. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas} DataAgendamento={DataAgendamento}",
+            request.IdCliente,
+            request.IdFundo,
+            request.TipoOperacao,
+            request.QuantidadeCotas,
+            request.DataAgendamento);
+
         CriarOrdemResultDto? result = null;
 
         await _transactionManager.ExecuteAsync(async ct =>
@@ -73,6 +85,7 @@ public sealed class CriarOrdemAgendadaUseCase
                 ordem.DataProcessamento);
         }, cancellationToken);
 
+        _logger.LogInformation("Ordem agendada criada. Ordem={IdOrdem} Status={Status} DataAgendamento={DataAgendamento}", result!.IdOrdem, result!.Status, result!.DataAgendamento);
         return result!;
     }
 }

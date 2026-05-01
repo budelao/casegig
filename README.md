@@ -113,6 +113,10 @@ O seed inicial é criado via migrations e inclui:
 - HostedService para processamento assíncrono (evita mensageria no escopo do case)
 - Controle de concorrência otimista com RowVersion
 
+## Observabilidade
+
+A aplicação utiliza logs estruturados em formato JSON, permitindo rastreabilidade das operações e fácil integração futura com ferramentas de monitoramento como Splunk, ELK ou CloudWatch.
+
 ## Uso de IA
 
 - Apoio na criação incremental da solução, alinhado aos documentos em `docs/`
