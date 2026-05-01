@@ -88,7 +88,7 @@ public sealed class OrdemService
         return ordem;
     }
 
-    public Ordem CriarOrdemAgendadaAporte(Cliente cliente, Fundo fundo, decimal quantidadeCotas, DateTime dataAgendamento, DateTime agora)
+    public Ordem CriarOrdemAgendadaAporte(Cliente cliente, Fundo fundo, decimal quantidadeCotas, DateOnly dataAgendamento, DateTime agora)
     {
         ValidarFundoAberto(fundo);
         ValidarDataAgendamento(dataAgendamento, agora);
@@ -103,9 +103,10 @@ public sealed class OrdemService
             throw new BusinessRuleException("Quantidade de cotas abaixo do mínimo permitido para o fundo.");
         }
 
+        var dataExecucao = dataAgendamento.ToDateTime(TimeOnly.FromTimeSpan(fundo.HorarioCorte));
         var ordem = NovaOrdemBase(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, quantidadeCotas, agora);
         ordem.Status = StatusOrdem.AGENDADA;
-        ordem.DataAgendamento = dataAgendamento.Date;
+        ordem.DataAgendamento = dataExecucao;
         return ordem;
     }
 
@@ -114,7 +115,7 @@ public sealed class OrdemService
         Fundo fundo,
         Posicao? posicao,
         decimal quantidadeCotas,
-        DateTime dataAgendamento,
+        DateOnly dataAgendamento,
         DateTime agora)
     {
         ValidarFundoAberto(fundo);
@@ -135,9 +136,10 @@ public sealed class OrdemService
         {
             throw new BusinessRuleException("Resgate viola o mínimo de permanência do fundo.");
         }
+        var dataExecucao = dataAgendamento.ToDateTime(TimeOnly.FromTimeSpan(fundo.HorarioCorte));
         var ordem = NovaOrdemBase(cliente.IdCliente, fundo.IdFundo, TipoOperacao.RESGATE, quantidadeCotas, agora);
         ordem.Status = StatusOrdem.AGENDADA;
-        ordem.DataAgendamento = dataAgendamento.Date;
+        ordem.DataAgendamento = dataExecucao;
         return ordem;
     }
 
@@ -157,10 +159,11 @@ public sealed class OrdemService
         }
     }
 
-    private static void ValidarDataAgendamento(DateTime dataAgendamento, DateTime agora)
+    private static void ValidarDataAgendamento(DateOnly dataAgendamento, DateTime agora)
     {
-        var data = dataAgendamento.Date;
-        if (data <= agora.Date)
+        var data = dataAgendamento;
+        var hoje = DateOnly.FromDateTime(agora.Date);
+        if (data <= hoje)
         {
             throw new BusinessRuleException("Data de agendamento deve ser futura (D+1 ou adiante).");
         }

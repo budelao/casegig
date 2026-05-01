@@ -38,10 +38,12 @@ public sealed class ProcessarOrdensAgendadasUseCase
     public async Task<ProcessamentoResumo> ExecuteAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
     {
         var ordens = await _ordemRepository.ListAgendadasParaProcessarAsync(agora, maximo, cancellationToken);
+        var encontradas = ordens.Count;
 
         var processadas = 0;
         var rejeitadas = 0;
         var conflitosConcorrencia = 0;
+        var erros = 0;
 
         foreach (var ordem in ordens)
         {
@@ -59,13 +61,13 @@ public sealed class ProcessarOrdensAgendadasUseCase
                     var cliente = await _clienteRepository.GetByIdAsync(ordem.IdCliente, ct);
                     if (cliente is null)
                     {
-                        throw new NotFoundException("Cliente não encontrado.");
+                        throw new BusinessRuleException("Cliente não encontrado.");
                     }
 
                     var fundo = await _fundoRepository.GetByIdAsync(ordem.IdFundo, ct);
                     if (fundo is null)
                     {
-                        throw new NotFoundException("Fundo não encontrado.");
+                        throw new BusinessRuleException("Fundo não encontrado.");
                     }
 
                     var posicao = await _posicaoRepository.GetByIdAsync(ordem.IdCliente, ordem.IdFundo, ct);
@@ -106,6 +108,11 @@ public sealed class ProcessarOrdensAgendadasUseCase
                             ordem.IdOrdem,
                             ex.Message);
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Erro inesperado durante o processamento da ordem. Ordem={IdOrdem}", ordem.IdOrdem);
+                        throw;
+                    }
                 }, cancellationToken);
             }
             catch (ConcurrencyException)
@@ -113,10 +120,15 @@ public sealed class ProcessarOrdensAgendadasUseCase
                 conflitosConcorrencia++;
                 _logger.LogWarning("Conflito de concorrência ao processar ordem. Ordem={IdOrdem}", ordem.IdOrdem);
             }
+            catch (Exception ex)
+            {
+                erros++;
+                _logger.LogError(ex, "Falha ao processar ordem agendada. Ordem={IdOrdem}", ordem.IdOrdem);
+            }
         }
 
-        return new ProcessamentoResumo(processadas, rejeitadas, conflitosConcorrencia);
+        return new ProcessamentoResumo(encontradas, processadas, rejeitadas, conflitosConcorrencia, erros);
     }
 }
 
-public sealed record ProcessamentoResumo(int Processadas, int Rejeitadas, int ConflitosConcorrencia);
+public sealed record ProcessamentoResumo(int Encontradas, int Processadas, int Rejeitadas, int ConflitosConcorrencia, int Erros);
