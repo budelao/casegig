@@ -2,9 +2,10 @@ using CaseGig.Domain.Enums;
 
 namespace CaseGig.Api.Contracts;
 
-public sealed record CriarOrdemRequest(
+public sealed record CriarOrdemAgendamentoRequest(
     Guid IdCliente,
     Guid IdFundo,
     TipoOperacao TipoOperacao,
-    decimal QuantidadeCotas
+    decimal QuantidadeCotas,
+    DateTime DataAgendamento
 );

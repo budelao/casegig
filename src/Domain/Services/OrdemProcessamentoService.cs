@@ -35,9 +35,9 @@ public sealed class OrdemProcessamentoService
 
         var valorOperacao = ordem.QuantidadeCotas * fundo.ValorCota;
 
-        if (valorOperacao < fundo.ValorMinimoAporte)
+        if (ordem.QuantidadeCotas < fundo.ValorMinimoAporte)
         {
-            throw new BusinessRuleException("Valor de aporte abaixo do mínimo permitido para o fundo.");
+            throw new BusinessRuleException("Quantidade de cotas abaixo do mínimo permitido para o fundo.");
         }
 
         if (cliente.SaldoDisponivel < valorOperacao)
@@ -81,10 +81,9 @@ public sealed class OrdemProcessamentoService
         }
 
         var cotasRestantes = posicao.QuantidadeCotas - ordem.QuantidadeCotas;
-        var valorRestante = cotasRestantes * fundo.ValorCota;
-        if (cotasRestantes > 0 && valorRestante < fundo.ValorMinimoPermanencia)
+        if (cotasRestantes > 0 && cotasRestantes < fundo.ValorMinimoPermanencia)
         {
-            throw new BusinessRuleException("Resgate viola o valor mínimo de permanência do fundo.");
+            throw new BusinessRuleException("Resgate viola o mínimo de permanência do fundo.");
         }
 
         var valorOperacao = ordem.QuantidadeCotas * fundo.ValorCota;
