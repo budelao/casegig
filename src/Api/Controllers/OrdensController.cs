@@ -42,10 +42,11 @@ public sealed class OrdensController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Criando ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao}",
+            "Criando ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
             request.IdCliente,
             request.IdFundo,
-            request.TipoOperacao);
+            request.TipoOperacao,
+            request.QuantidadeCotas);
 
         var dto = new CriarOrdemRequestDto(
             request.IdCliente,

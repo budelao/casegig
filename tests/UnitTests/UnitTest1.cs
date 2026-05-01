@@ -97,6 +97,16 @@ public sealed class OrdemRulesTests
     }
 
     [Fact]
+    public void CriarOrdemResgate_DeveRejeitar_QuandoSaldoRemanescenteMaiorQueZeroEFicaAbaixoDoMinimo()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 50m);
+        var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 200m };
+
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 170m, HojeAs(10, 0)));
+    }
+
+    [Fact]
     public void CriarOrdem_DeveRejeitar_QuandoFundoFechado()
     {
         var cliente = NovoCliente(10000m);
@@ -140,6 +150,22 @@ public sealed class OrdemRulesTests
         Assert.Equal(StatusOrdem.CONCLUIDA, ordem.Status);
         Assert.Equal(50m, cliente.SaldoDisponivel);
         Assert.Equal(15m, posicao.QuantidadeCotas);
+    }
+
+    [Fact]
+    public void ProcessarOrdemResgate_DeveDebitar_ExatamenteQuantidadeInformada()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 0m);
+        var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 600m };
+
+        var ordem = _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 500m, HojeAs(10, 0));
+        _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
+        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
+        _processamentoService.Concluir(ordem, HojeAs(10, 0));
+
+        Assert.Equal(100m, posicao.QuantidadeCotas);
+        Assert.Equal(5000m, cliente.SaldoDisponivel);
     }
 
     private static Cliente NovoCliente(decimal saldo)
