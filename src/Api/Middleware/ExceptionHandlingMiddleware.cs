@@ -1,6 +1,7 @@
 using CaseGig.Api.Contracts;
 using CaseGig.Application.Exceptions;
 using CaseGig.Domain.Exceptions;
+using System.Data.Common;
 using System.Net;
 
 namespace CaseGig.Api.Middleware;
@@ -36,10 +37,27 @@ public sealed class ExceptionHandlingMiddleware
             _logger.LogWarning(ex, "Conflito de concorrência");
             await WriteErrorAsync(context, HttpStatusCode.Conflict, ex.Message);
         }
+        catch (DbException ex)
+        {
+            _logger.LogError(ex, "Erro de banco de dados");
+
+            var env = context.RequestServices.GetService<IHostEnvironment>();
+            var message = env?.IsDevelopment() == true
+                ? ex.Message
+                : "Erro ao acessar o banco de dados.";
+
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro não tratado");
-            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, "Ocorreu um erro inesperado.");
+
+            var env = context.RequestServices.GetService<IHostEnvironment>();
+            var message = env?.IsDevelopment() == true
+                ? ex.Message
+                : "Ocorreu um erro inesperado.";
+
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, message);
         }
     }
 
