@@ -37,8 +37,9 @@ builder.Logging.AddConsoleFormatter<ColoredJsonConsoleFormatter, ColoredJsonCons
         Indented = false,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
-    options.WorkerColor = ConsoleColor.DarkYellow;
-    options.ApiColor = ConsoleColor.DarkGreen;
+    options.UseColors = !Console.IsOutputRedirected;
+    options.WorkerColor = ConsoleColor.Yellow;
+    options.ApiColor = ConsoleColor.Green;
 });
 
 builder.Services.AddControllers()
@@ -111,9 +112,9 @@ app.Run();
 
 sealed class ColoredJsonConsoleFormatterOptions : ConsoleFormatterOptions
 {
-    public ConsoleColor WorkerColor { get; set; } = ConsoleColor.DarkYellow;
-    public ConsoleColor ApiColor { get; set; } = ConsoleColor.DarkGreen;
-    public bool UseColors { get; set; } = true;
+    public ConsoleColor WorkerColor { get; set; } = ConsoleColor.Yellow;
+    public ConsoleColor ApiColor { get; set; } = ConsoleColor.Green;
+    public bool UseColors { get; set; } = !Console.IsOutputRedirected;
     public JsonWriterOptions JsonWriterOptions { get; set; } = new()
     {
         Indented = false,
@@ -180,6 +181,7 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             ["EventId"] = logEntry.EventId.Id,
             ["LogLevel"] = logEntry.LogLevel.ToString(),
             ["Category"] = logEntry.Category,
+            ["Source"] = GetSource(logEntry.Category),
             ["Message"] = message,
             ["State"] = state,
             ["Scopes"] = scopes
@@ -225,12 +227,7 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             return _options.WorkerColor;
         }
 
-        if (category.StartsWith("CaseGig.Api", StringComparison.Ordinal))
-        {
-            return _options.ApiColor;
-        }
-
-        return Console.ForegroundColor;
+        return _options.ApiColor;
     }
 
     private static string? GetPrefix(string category)
@@ -240,12 +237,17 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             return "WORKER:";
         }
 
-        if (category.StartsWith("CaseGig.Api", StringComparison.Ordinal))
+        return "API:";
+    }
+
+    private static string GetSource(string category)
+    {
+        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
         {
-            return "API:";
+            return "WORKER";
         }
 
-        return null;
+        return "API";
     }
 }
 
