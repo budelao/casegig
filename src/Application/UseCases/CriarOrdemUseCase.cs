@@ -102,17 +102,7 @@ public sealed class CriarOrdemUseCase
 
     private Domain.Entities.Ordem CriarOrdemAporte(Domain.Entities.Cliente cliente, Domain.Entities.Fundo fundo, CriarOrdemRequestDto request, DateTime agora)
     {
-        if (request.ValorAporte is null && request.QuantidadeCotas is null)
-        {
-            throw new BusinessRuleException("Informe ValorAporte ou QuantidadeCotas para operação de APORTE.");
-        }
-
-        if (request.QuantidadeCotas is not null)
-        {
-            return _ordemService.CriarOrdemAportePorCotas(cliente, fundo, request.QuantidadeCotas.Value, agora);
-        }
-
-        return _ordemService.CriarOrdemAporte(cliente, fundo, request.ValorAporte!.Value, agora);
+        return _ordemService.CriarOrdemAportePorCotas(cliente, fundo, request.QuantidadeCotas, agora);
     }
 
     private Domain.Entities.Ordem CriarOrdemResgate(
@@ -122,11 +112,6 @@ public sealed class CriarOrdemUseCase
         CriarOrdemRequestDto request,
         DateTime agora)
     {
-        if (request.QuantidadeCotas is null)
-        {
-            throw new BusinessRuleException("QuantidadeCotas é obrigatória para operação de RESGATE.");
-        }
-
-        return _ordemService.CriarOrdemResgate(cliente, fundo, posicao, request.QuantidadeCotas.Value, agora);
+        return _ordemService.CriarOrdemResgate(cliente, fundo, posicao, request.QuantidadeCotas, agora);
     }
 }

@@ -6,6 +6,5 @@ public sealed record CriarOrdemRequestDto(
     Guid IdCliente,
     Guid IdFundo,
     TipoOperacao TipoOperacao,
-    decimal? ValorAporte,
-    decimal? QuantidadeCotas
+    decimal QuantidadeCotas
 );

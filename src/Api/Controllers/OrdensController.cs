@@ -51,7 +51,6 @@ public sealed class OrdensController : ControllerBase
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
-            request.ValorAporte,
             request.QuantidadeCotas);
 
         var result = await _criarOrdemUseCase.ExecuteAsync(dto, DateTime.Now, cancellationToken);
@@ -112,22 +111,9 @@ public sealed class OrdensController : ControllerBase
             errors.Add("IdFundo é obrigatório.");
         }
 
-        if (request.TipoOperacao == TipoOperacao.APORTE)
+        if (request.QuantidadeCotas <= 0)
         {
-            var valorAporteValido = request.ValorAporte is not null && request.ValorAporte > 0;
-            var quantidadeCotasValida = request.QuantidadeCotas is not null && request.QuantidadeCotas > 0;
-
-            if (!valorAporteValido && !quantidadeCotasValida)
-            {
-                errors.Add("Informe ValorAporte ou QuantidadeCotas (maior que zero) para APORTE.");
-            }
-        }
-        else if (request.TipoOperacao == TipoOperacao.RESGATE)
-        {
-            if (request.QuantidadeCotas is null || request.QuantidadeCotas <= 0)
-            {
-                errors.Add("QuantidadeCotas é obrigatória e deve ser maior que zero para RESGATE.");
-            }
+            errors.Add("QuantidadeCotas é obrigatória e deve ser maior que zero.");
         }
 
         return errors;

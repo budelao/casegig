@@ -16,7 +16,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(100m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 200m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 20m, HojeAs(10, 0)));
         Assert.Contains("Saldo insuficiente", ex.Message);
     }
 
@@ -37,11 +37,11 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0), valorCota: 10m, valorMinimoAporte: 100m);
 
-        var dentro = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(13, 0));
+        var dentro = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(13, 0));
         Assert.Equal(StatusOrdem.CRIADA, dentro.Status);
         Assert.Null(dentro.DataAgendamento);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(15, 0)));
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(15, 0)));
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 50m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 5m, HojeAs(10, 0)));
         Assert.Contains("abaixo do mínimo", ex.Message);
     }
 
@@ -93,7 +93,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoFechado(valorCota: 10m, valorMinimoAporte: 100m);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0)));
 
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
         Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 1m, HojeAs(10, 0)));
@@ -105,7 +105,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(1000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ordem = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(10, 0));
+        var ordem = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0));
         _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
         _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null);
         _processamentoService.Concluir(ordem, HojeAs(10, 0));
