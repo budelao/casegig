@@ -20,7 +20,8 @@ public sealed class RequestLoggingMiddleware
         var scope = new Dictionary<string, object>
         {
             ["CorrelationId"] = correlationId,
-            ["TraceId"] = context.TraceIdentifier
+            ["TraceId"] = context.TraceIdentifier,
+            ["Source"] = "API"
         };
 
         using (_logger.BeginScope(scope))
@@ -28,7 +29,7 @@ public sealed class RequestLoggingMiddleware
             var startedAt = System.Diagnostics.Stopwatch.StartNew();
 
             _logger.LogInformation(
-                "HTTP request started. Method={Method} Path={Path} QueryString={QueryString} ContentLength={ContentLength}",
+                "API: HTTP request started. Method={Method} Path={Path} QueryString={QueryString} ContentLength={ContentLength}",
                 context.Request.Method,
                 context.Request.Path.Value,
                 context.Request.QueryString.Value,
@@ -39,7 +40,7 @@ public sealed class RequestLoggingMiddleware
                 await _next(context);
 
                 _logger.LogInformation(
-                    "HTTP request finished. StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+                    "API: HTTP request finished. StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
                     context.Response.StatusCode,
                     startedAt.ElapsedMilliseconds);
             }
@@ -47,7 +48,7 @@ public sealed class RequestLoggingMiddleware
             {
                 _logger.LogError(
                     ex,
-                    "HTTP request failed. ElapsedMs={ElapsedMs}",
+                    "API: HTTP request failed. ElapsedMs={ElapsedMs}",
                     startedAt.ElapsedMilliseconds);
                 throw;
             }
