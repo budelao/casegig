@@ -7,5 +7,5 @@ public sealed record CriarOrdemAgendamentoRequest(
     Guid IdFundo,
     TipoOperacao TipoOperacao,
     decimal QuantidadeCotas,
-    DateTime DataAgendamento
+    DateOnly DataAgendamento
 );
