@@ -43,15 +43,14 @@ Em ambiente Development, a API tenta aplicar migrations automaticamente no start
 
 `POST /api/ordens`
 
-Exemplo (APORTE por valor financeiro):
+Exemplo (APORTE por quantidade de cotas):
 
 ```json
 {
   "idCliente": "11111111-1111-1111-1111-111111111111",
   "idFundo": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   "tipoOperacao": "APORTE",
-  "valorAporte": 100.0,
-  "quantidadeCotas": null
+  "quantidadeCotas": 10.0
 }
 ```
 
@@ -62,7 +61,6 @@ Exemplo (RESGATE por quantidade de cotas):
   "idCliente": "11111111-1111-1111-1111-111111111111",
   "idFundo": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   "tipoOperacao": "RESGATE",
-  "valorAporte": null,
   "quantidadeCotas": 10.0
 }
 ```
