@@ -44,9 +44,9 @@ public sealed class OrdemService
 
         var valorAporte = quantidadeCotas * fundo.ValorCota;
 
-        if (valorAporte < fundo.ValorMinimoAporte)
+        if (quantidadeCotas < fundo.ValorMinimoAporte)
         {
-            throw new BusinessRuleException("Valor de aporte abaixo do mínimo permitido para o fundo.");
+            throw new BusinessRuleException("Quantidade de cotas abaixo do mínimo permitido para o fundo.");
         }
 
         if (cliente.SaldoDisponivel < valorAporte)
@@ -99,10 +99,9 @@ public sealed class OrdemService
             throw new BusinessRuleException("Quantidade de cotas deve ser maior que zero.");
         }
 
-        var valorAporte = quantidadeCotas * fundo.ValorCota;
-        if (valorAporte < fundo.ValorMinimoAporte)
+        if (quantidadeCotas < fundo.ValorMinimoAporte)
         {
-            throw new BusinessRuleException("Valor de aporte abaixo do mínimo permitido para o fundo.");
+            throw new BusinessRuleException("Quantidade de cotas abaixo do mínimo permitido para o fundo.");
         }
 
         var ordem = NovaOrdemBase(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, quantidadeCotas, agora);

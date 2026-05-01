@@ -35,9 +35,9 @@ public sealed class OrdemProcessamentoService
 
         var valorOperacao = ordem.QuantidadeCotas * fundo.ValorCota;
 
-        if (valorOperacao < fundo.ValorMinimoAporte)
+        if (ordem.QuantidadeCotas < fundo.ValorMinimoAporte)
         {
-            throw new BusinessRuleException("Valor de aporte abaixo do mínimo permitido para o fundo.");
+            throw new BusinessRuleException("Quantidade de cotas abaixo do mínimo permitido para o fundo.");
         }
 
         if (cliente.SaldoDisponivel < valorOperacao)
