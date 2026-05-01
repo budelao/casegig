@@ -137,11 +137,6 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
     public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter)
     {
         var message = logEntry.Formatter?.Invoke(logEntry.State, logEntry.Exception);
-        var prefix = GetPrefix(logEntry.Category);
-        if (!string.IsNullOrWhiteSpace(prefix) && !string.IsNullOrWhiteSpace(message))
-        {
-            message = $"{prefix} {message}";
-        }
 
         Dictionary<string, object?>? state = null;
         if (logEntry.State is IEnumerable<KeyValuePair<string, object?>> stateValues)
@@ -228,16 +223,6 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
         }
 
         return _options.ApiColor;
-    }
-
-    private static string? GetPrefix(string category)
-    {
-        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
-        {
-            return "WORKER:";
-        }
-
-        return "API:";
     }
 
     private static string GetSource(string category)
