@@ -7,7 +7,7 @@ using CaseGig.Domain.Services;
 
 namespace CaseGig.Application.UseCases;
 
-public sealed class CriarOrdemUseCase
+public sealed class CriarOrdemAgendadaUseCase
 {
     private readonly ITransactionManager _transactionManager;
     private readonly IClienteRepository _clienteRepository;
@@ -15,16 +15,14 @@ public sealed class CriarOrdemUseCase
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
     private readonly OrdemService _ordemService;
-    private readonly OrdemProcessamentoService _processamentoService;
 
-    public CriarOrdemUseCase(
+    public CriarOrdemAgendadaUseCase(
         ITransactionManager transactionManager,
         IClienteRepository clienteRepository,
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
-        OrdemService ordemService,
-        OrdemProcessamentoService processamentoService)
+        OrdemService ordemService)
     {
         _transactionManager = transactionManager;
         _clienteRepository = clienteRepository;
@@ -32,10 +30,9 @@ public sealed class CriarOrdemUseCase
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
         _ordemService = ordemService;
-        _processamentoService = processamentoService;
     }
 
-    public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemRequestDto request, DateTime agora, CancellationToken cancellationToken)
+    public async Task<CriarOrdemResultDto> ExecuteAsync(CriarOrdemAgendamentoRequestDto request, DateTime agora, CancellationToken cancellationToken)
     {
         CriarOrdemResultDto? result = null;
 
@@ -57,33 +54,12 @@ public sealed class CriarOrdemUseCase
 
             var ordem = request.TipoOperacao switch
             {
-                TipoOperacao.APORTE => CriarOrdemAporte(cliente, fundo, request, agora),
-                TipoOperacao.RESGATE => CriarOrdemResgate(cliente, fundo, posicao, request, agora),
+                TipoOperacao.APORTE => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, request.QuantidadeCotas, request.DataAgendamento, agora),
+                TipoOperacao.RESGATE => _ordemService.CriarOrdemAgendadaResgate(cliente, fundo, posicao, request.QuantidadeCotas, request.DataAgendamento, agora),
                 _ => throw new BusinessRuleException("Tipo de operação inválido.")
             };
 
             await _ordemRepository.AddAsync(ordem, ct);
-
-            if (ordem.Status == StatusOrdem.CRIADA)
-            {
-                _processamentoService.PrepararParaProcessamento(ordem, agora);
-
-                if (ordem.TipoOperacao == TipoOperacao.APORTE)
-                {
-                    _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao);
-                }
-                else
-                {
-                    if (posicao is null)
-                    {
-                        throw new BusinessRuleException("Posição do cliente no fundo não encontrada.");
-                    }
-
-                    _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
-                }
-
-                _processamentoService.Concluir(ordem, agora);
-            }
 
             result = new CriarOrdemResultDto(
                 ordem.IdOrdem,
@@ -98,20 +74,5 @@ public sealed class CriarOrdemUseCase
         }, cancellationToken);
 
         return result!;
-    }
-
-    private Domain.Entities.Ordem CriarOrdemAporte(Domain.Entities.Cliente cliente, Domain.Entities.Fundo fundo, CriarOrdemRequestDto request, DateTime agora)
-    {
-        return _ordemService.CriarOrdemAportePorCotas(cliente, fundo, request.QuantidadeCotas, agora);
-    }
-
-    private Domain.Entities.Ordem CriarOrdemResgate(
-        Domain.Entities.Cliente cliente,
-        Domain.Entities.Fundo fundo,
-        Domain.Entities.Posicao? posicao,
-        CriarOrdemRequestDto request,
-        DateTime agora)
-    {
-        return _ordemService.CriarOrdemResgate(cliente, fundo, posicao, request.QuantidadeCotas, agora);
     }
 }

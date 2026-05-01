@@ -14,9 +14,9 @@ public sealed class OrdemRulesTests
     public void CriarOrdemAporte_DeveRejeitar_QuandoSaldoInsuficiente()
     {
         var cliente = NovoCliente(100m);
-        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 1m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 200m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 20m, HojeAs(10, 0)));
         Assert.Contains("Saldo insuficiente", ex.Message);
     }
 
@@ -35,16 +35,35 @@ public sealed class OrdemRulesTests
     public void CriarOrdem_DeveRespeitar_Cutoff()
     {
         var cliente = NovoCliente(10000m);
-        var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0), valorCota: 10m, valorMinimoAporte: 100m);
+        var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0), valorCota: 10m, valorMinimoAporte: 1m);
 
-        var dentro = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(13, 0));
+        var dentro = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(13, 0));
         Assert.Equal(StatusOrdem.CRIADA, dentro.Status);
         Assert.Null(dentro.DataAgendamento);
 
-        var fora = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(15, 0));
-        Assert.Equal(StatusOrdem.AGENDADA, fora.Status);
-        Assert.NotNull(fora.DataAgendamento);
-        Assert.True(fora.DataAgendamento!.Value.Date > HojeAs(0, 0).Date);
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(15, 0)));
+    }
+
+    [Fact]
+    public void CriarOrdemAgendada_DeveValidar_DataUtilEFutura()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, HojeAs(0, 0), HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, new DateTime(2026, 5, 2), HojeAs(10, 0)));
+    }
+
+    [Fact]
+    public void CriarOrdemAgendadaAporte_NaoDeveValidar_SaldoNoMomentoDoAgendamento()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+
+        var ordem = _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 100m, new DateTime(2026, 5, 4), HojeAs(10, 0));
+        Assert.Equal(StatusOrdem.AGENDADA, ordem.Status);
+        Assert.Equal(new DateTime(2026, 5, 4), ordem.DataAgendamento);
+        Assert.Equal(100m, ordem.QuantidadeCotas);
     }
 
     [Fact]
@@ -53,8 +72,17 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 50m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 5m, HojeAs(10, 0)));
         Assert.Contains("abaixo do mínimo", ex.Message);
+    }
+
+    [Fact]
+    public void CriarOrdemAporte_DeveRejeitar_QuandoQuantidadeCotasAbaixoDoMinimoDoFundo()
+    {
+        var cliente = NovoCliente(10000m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 50m, HojeAs(10, 0)));
     }
 
     [Fact]
@@ -69,12 +97,22 @@ public sealed class OrdemRulesTests
     }
 
     [Fact]
+    public void CriarOrdemResgate_DeveRejeitar_QuandoSaldoRemanescenteMaiorQueZeroEFicaAbaixoDoMinimo()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 50m);
+        var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 200m };
+
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 170m, HojeAs(10, 0)));
+    }
+
+    [Fact]
     public void CriarOrdem_DeveRejeitar_QuandoFundoFechado()
     {
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoFechado(valorCota: 10m, valorMinimoAporte: 100m);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0)));
 
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
         Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 1m, HojeAs(10, 0)));
@@ -84,9 +122,9 @@ public sealed class OrdemRulesTests
     public void ProcessarOrdemAporte_DeveAtualizar_SaldoEPosicao()
     {
         var cliente = NovoCliente(1000m);
-        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 1m);
 
-        var ordem = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(10, 0));
+        var ordem = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0));
         _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
         _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null);
         _processamentoService.Concluir(ordem, HojeAs(10, 0));
@@ -112,6 +150,22 @@ public sealed class OrdemRulesTests
         Assert.Equal(StatusOrdem.CONCLUIDA, ordem.Status);
         Assert.Equal(50m, cliente.SaldoDisponivel);
         Assert.Equal(15m, posicao.QuantidadeCotas);
+    }
+
+    [Fact]
+    public void ProcessarOrdemResgate_DeveDebitar_ExatamenteQuantidadeInformada()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 0m);
+        var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 600m };
+
+        var ordem = _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 500m, HojeAs(10, 0));
+        _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
+        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
+        _processamentoService.Concluir(ordem, HojeAs(10, 0));
+
+        Assert.Equal(100m, posicao.QuantidadeCotas);
+        Assert.Equal(5000m, cliente.SaldoDisponivel);
     }
 
     private static Cliente NovoCliente(decimal saldo)

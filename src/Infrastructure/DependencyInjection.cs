@@ -19,6 +19,11 @@ public static class DependencyInjection
             throw new InvalidOperationException("ConnectionStrings:MySql não configurado.");
         }
 
+        if (connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("ConnectionStrings:MySql está com valor placeholder. Configure ConnectionStrings__MySql (variável de ambiente) ou appsettings.Development.json.");
+        }
+
         services.AddDbContext<InvestmentDbContext>(options =>
         {
             var serverVersion = new MySqlServerVersion(new Version(8, 0, 36));
