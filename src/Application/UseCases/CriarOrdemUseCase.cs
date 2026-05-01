@@ -102,12 +102,17 @@ public sealed class CriarOrdemUseCase
 
     private Domain.Entities.Ordem CriarOrdemAporte(Domain.Entities.Cliente cliente, Domain.Entities.Fundo fundo, CriarOrdemRequestDto request, DateTime agora)
     {
-        if (request.ValorAporte is null)
+        if (request.ValorAporte is null && request.QuantidadeCotas is null)
         {
-            throw new BusinessRuleException("ValorAporte é obrigatório para operação de APORTE.");
+            throw new BusinessRuleException("Informe ValorAporte ou QuantidadeCotas para operação de APORTE.");
         }
 
-        return _ordemService.CriarOrdemAporte(cliente, fundo, request.ValorAporte.Value, agora);
+        if (request.QuantidadeCotas is not null)
+        {
+            return _ordemService.CriarOrdemAportePorCotas(cliente, fundo, request.QuantidadeCotas.Value, agora);
+        }
+
+        return _ordemService.CriarOrdemAporte(cliente, fundo, request.ValorAporte!.Value, agora);
     }
 
     private Domain.Entities.Ordem CriarOrdemResgate(

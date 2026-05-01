@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CaseGig.Api.Controllers;
 
 [ApiController]
-[Route("api/posicoes")]
+[Route("posicoes")]
 public sealed class PosicoesController : ControllerBase
 {
     private readonly ConsultarPosicoesUseCase _consultarPosicoesUseCase;

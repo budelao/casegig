@@ -41,10 +41,29 @@ public sealed class OrdemRulesTests
         Assert.Equal(StatusOrdem.CRIADA, dentro.Status);
         Assert.Null(dentro.DataAgendamento);
 
-        var fora = _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(15, 0));
-        Assert.Equal(StatusOrdem.AGENDADA, fora.Status);
-        Assert.NotNull(fora.DataAgendamento);
-        Assert.True(fora.DataAgendamento!.Value.Date > HojeAs(0, 0).Date);
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAporte(cliente, fundo, 100m, HojeAs(15, 0)));
+    }
+
+    [Fact]
+    public void CriarOrdemAgendada_DeveValidar_DataUtilEFutura()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, HojeAs(0, 0), HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, new DateTime(2026, 5, 2), HojeAs(10, 0)));
+    }
+
+    [Fact]
+    public void CriarOrdemAgendadaAporte_NaoDeveValidar_SaldoNoMomentoDoAgendamento()
+    {
+        var cliente = NovoCliente(0m);
+        var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
+
+        var ordem = _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, new DateTime(2026, 5, 4), HojeAs(10, 0));
+        Assert.Equal(StatusOrdem.AGENDADA, ordem.Status);
+        Assert.Equal(new DateTime(2026, 5, 4), ordem.DataAgendamento);
+        Assert.Equal(10m, ordem.QuantidadeCotas);
     }
 
     [Fact]

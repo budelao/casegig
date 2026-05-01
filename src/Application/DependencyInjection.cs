@@ -8,6 +8,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<CriarOrdemUseCase>();
+        services.AddScoped<CriarOrdemAgendadaUseCase>();
         services.AddScoped<ConsultarOrdensUseCase>();
         services.AddScoped<ConsultarPosicoesUseCase>();
         services.AddScoped<ProcessarOrdensAgendadasUseCase>();
