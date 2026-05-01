@@ -1,0 +1,60 @@
+using CaseGig.Api.Contracts;
+using CaseGig.Application.Exceptions;
+using CaseGig.Domain.Exceptions;
+using System.Net;
+
+namespace CaseGig.Api.Middleware;
+
+public sealed class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    public async Task Invoke(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (NotFoundException ex)
+        {
+            await WriteErrorAsync(context, HttpStatusCode.NotFound, ex.Message);
+        }
+        catch (BusinessRuleException ex)
+        {
+            _logger.LogWarning(ex, "Falha de validação de negócio");
+            await WriteErrorAsync(context, HttpStatusCode.UnprocessableEntity, ex.Message);
+        }
+        catch (ConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Conflito de concorrência");
+            await WriteErrorAsync(context, HttpStatusCode.Conflict, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro não tratado");
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, "Ocorreu um erro inesperado.");
+        }
+    }
+
+    private static async Task WriteErrorAsync(HttpContext context, HttpStatusCode statusCode, params string[] errors)
+    {
+        if (context.Response.HasStarted)
+        {
+            return;
+        }
+
+        context.Response.Clear();
+        context.Response.StatusCode = (int)statusCode;
+        context.Response.ContentType = "application/json";
+
+        var payload = ApiResponse<object>.Fail(errors);
+        await context.Response.WriteAsJsonAsync(payload);
+    }
+}
