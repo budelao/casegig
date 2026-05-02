@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -10,6 +10,10 @@ namespace CaseGig.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "FK_Ordens_Clientes_IdCliente",
+                table: "Ordens");
+
             migrationBuilder.DropIndex(
                 name: "IX_Ordens_IdCliente",
                 table: "Ordens");
@@ -43,11 +47,23 @@ namespace CaseGig.Infrastructure.Migrations
                 table: "Ordens",
                 columns: new[] { "IdCliente", "IdempotencyOperation", "IdempotencyKey" },
                 unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Ordens_Clientes_IdCliente",
+                table: "Ordens",
+                column: "IdCliente",
+                principalTable: "Clientes",
+                principalColumn: "IdCliente",
+                onDelete: ReferentialAction.Cascade);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "FK_Ordens_Clientes_IdCliente",
+                table: "Ordens");
+
             migrationBuilder.DropIndex(
                 name: "IX_Ordens_IdCliente_IdempotencyOperation_IdempotencyKey",
                 table: "Ordens");
@@ -68,6 +84,14 @@ namespace CaseGig.Infrastructure.Migrations
                 name: "IX_Ordens_IdCliente",
                 table: "Ordens",
                 column: "IdCliente");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Ordens_Clientes_IdCliente",
+                table: "Ordens",
+                column: "IdCliente",
+                principalTable: "Clientes",
+                principalColumn: "IdCliente",
+                onDelete: ReferentialAction.Cascade);
         }
     }
 }
