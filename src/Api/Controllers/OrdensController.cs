@@ -60,8 +60,15 @@ public sealed class OrdensController : ControllerBase
             request.TipoOperacao,
             request.QuantidadeCotas);
 
-        var result = await _criarOrdemUseCase.ExecuteAsync(dto, DateTime.Now, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, ApiResponse<CriarOrdemResultDto>.Ok(result));
+        var idempotencyKey = GetIdempotencyKey();
+        var result = await _criarOrdemUseCase.ExecuteAsync(dto, DateTime.Now, idempotencyKey, cancellationToken);
+        if (result.IsReplay)
+        {
+            Response.Headers["Idempotency-Replayed"] = "true";
+            return Ok(ApiResponse<CriarOrdemResultDto>.Ok(result.Result));
+        }
+
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<CriarOrdemResultDto>.Ok(result.Result));
     }
 
     [HttpPost("agendamento")]
@@ -99,8 +106,15 @@ public sealed class OrdensController : ControllerBase
             request.QuantidadeCotas,
             request.DataAgendamento);
 
-        var result = await _criarOrdemAgendadaUseCase.ExecuteAsync(dto, DateTime.Now, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, ApiResponse<CriarOrdemResultDto>.Ok(result));
+        var idempotencyKey = GetIdempotencyKey();
+        var result = await _criarOrdemAgendadaUseCase.ExecuteAsync(dto, DateTime.Now, idempotencyKey, cancellationToken);
+        if (result.IsReplay)
+        {
+            Response.Headers["Idempotency-Replayed"] = "true";
+            return Ok(ApiResponse<CriarOrdemResultDto>.Ok(result.Result));
+        }
+
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<CriarOrdemResultDto>.Ok(result.Result));
     }
 
     [HttpGet]
@@ -164,5 +178,16 @@ public sealed class OrdensController : ControllerBase
         }
 
         return errors;
+    }
+
+    private string? GetIdempotencyKey()
+    {
+        if (!Request.Headers.TryGetValue("Idempotency-Key", out var value))
+        {
+            return null;
+        }
+
+        var key = value.ToString().Trim();
+        return string.IsNullOrWhiteSpace(key) ? null : key;
     }
 }
