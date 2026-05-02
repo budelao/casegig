@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("mysql", "aurora-mysql", "postgres", "aurora-postgres")]
+    [ValidateSet("mysql", "aurora-mysql", "postgres", "aurora-postgres", "sqlserver")]
     [string]$Engine,
 
     [Parameter(Mandatory = $true)]
@@ -35,6 +35,11 @@ function Get-MySqlPort([int]$value) {
 function Get-PostgresPort([int]$value) {
     if ($value -gt 0) { return $value }
     return 5432
+}
+
+function Get-SqlServerPort([int]$value) {
+    if ($value -gt 0) { return $value }
+    return 1433
 }
 
 function Get-MySqlInitSql([string]$databaseName, [bool]$includeSeed) {
@@ -197,6 +202,134 @@ $seedSql
 
 $includeSeed = -not $SkipSeed.IsPresent
 
+if ($Engine -eq "sqlserver" -and ($PSBoundParameters.ContainsKey("Schema") -eq $false)) {
+    $Schema = "dbo"
+}
+
+function Get-SqlServerCreateDatabaseSql([string]$databaseName) {
+    return @"
+IF DB_ID(N'$databaseName') IS NULL
+BEGIN
+    DECLARE @sql nvarchar(max) = N'CREATE DATABASE ' + QUOTENAME(N'$databaseName') + N';';
+    EXEC(@sql);
+END
+"@
+}
+
+function Get-SqlServerInitSql([string]$databaseName, [string]$schemaName, [bool]$includeSeed) {
+    $schema = $schemaName
+
+    $seedSql = ""
+    if ($includeSeed) {
+        $seedSql = @"
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Clientes] WHERE [IdCliente] = '11111111-1111-1111-1111-111111111111')
+INSERT INTO [$schema].[Clientes] ([IdCliente], [Nome], [Cpf], [SaldoDisponivel], [RowVersion]) VALUES
+('11111111-1111-1111-1111-111111111111', N'João Silva', '11111111111', 10000.00, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Clientes] WHERE [IdCliente] = '22222222-2222-2222-2222-222222222222')
+INSERT INTO [$schema].[Clientes] ([IdCliente], [Nome], [Cpf], [SaldoDisponivel], [RowVersion]) VALUES
+('22222222-2222-2222-2222-222222222222', N'Maria Souza', '22222222222', 100.00, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Fundos] WHERE [IdFundo] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+INSERT INTO [$schema].[Fundos] ([IdFundo], [Nome], [HorarioCorte], [ValorCota], [ValorMinimoAporte], [ValorMinimoPermanencia], [StatusCaptacao], [RowVersion]) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', N'Fundo Renda Fixa', '14:00:00', 10.000000, 100.00, 50.00, 'ABERTO', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Fundos] WHERE [IdFundo] = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
+INSERT INTO [$schema].[Fundos] ([IdFundo], [Nome], [HorarioCorte], [ValorCota], [ValorMinimoAporte], [ValorMinimoPermanencia], [StatusCaptacao], [RowVersion]) VALUES
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', N'Fundo Ações Fechado', '14:00:00', 20.000000, 200.00, 100.00, 'FECHADO', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Posicoes] WHERE [IdCliente] = '11111111-1111-1111-1111-111111111111' AND [IdFundo] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+INSERT INTO [$schema].[Posicoes] ([IdCliente], [IdFundo], [QuantidadeCotas], [RowVersion]) VALUES
+('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 500.000000000000000000, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [$schema].[Posicoes] WHERE [IdCliente] = '22222222-2222-2222-2222-222222222222' AND [IdFundo] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+INSERT INTO [$schema].[Posicoes] ([IdCliente], [IdFundo], [QuantidadeCotas], [RowVersion]) VALUES
+('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 5.000000000000000000, 1);
+"@
+    }
+
+    return @"
+IF SCHEMA_ID(N'$schema') IS NULL
+BEGIN
+    DECLARE @schemaSql nvarchar(max) = N'CREATE SCHEMA ' + QUOTENAME(N'$schema') + N';';
+    EXEC(@schemaSql);
+END
+
+IF OBJECT_ID(N'[$schema].[Clientes]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [$schema].[Clientes] (
+      [IdCliente] uniqueidentifier NOT NULL,
+      [Nome] nvarchar(200) NOT NULL,
+      [Cpf] varchar(11) NOT NULL,
+      [SaldoDisponivel] decimal(18,2) NOT NULL,
+      [RowVersion] bigint NOT NULL,
+      CONSTRAINT [PK_Clientes] PRIMARY KEY ([IdCliente])
+    );
+END
+
+IF OBJECT_ID(N'[$schema].[Fundos]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [$schema].[Fundos] (
+      [IdFundo] uniqueidentifier NOT NULL,
+      [Nome] nvarchar(200) NOT NULL,
+      [HorarioCorte] time(0) NOT NULL,
+      [ValorCota] decimal(18,6) NOT NULL,
+      [ValorMinimoAporte] decimal(18,2) NOT NULL,
+      [ValorMinimoPermanencia] decimal(18,2) NOT NULL,
+      [StatusCaptacao] varchar(10) NOT NULL,
+      [RowVersion] bigint NOT NULL,
+      CONSTRAINT [PK_Fundos] PRIMARY KEY ([IdFundo])
+    );
+END
+
+IF OBJECT_ID(N'[$schema].[Ordens]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [$schema].[Ordens] (
+      [IdOrdem] uniqueidentifier NOT NULL,
+      [IdCliente] uniqueidentifier NOT NULL,
+      [IdFundo] uniqueidentifier NOT NULL,
+      [TipoOperacao] varchar(10) NOT NULL,
+      [QuantidadeCotas] decimal(38,18) NOT NULL,
+      [DataCriacao] datetime2(6) NOT NULL,
+      [DataAgendamento] datetime2(6) NULL,
+      [DataProcessamento] datetime2(6) NULL,
+      [Status] varchar(20) NOT NULL,
+      [RowVersion] bigint NOT NULL,
+      [IdempotencyKey] varchar(200) NULL,
+      [IdempotencyOperation] varchar(80) NULL,
+      [IdempotencyRequestHash] varchar(64) NULL,
+      CONSTRAINT [PK_Ordens] PRIMARY KEY ([IdOrdem]),
+      CONSTRAINT [FK_Ordens_Clientes_IdCliente] FOREIGN KEY ([IdCliente]) REFERENCES [$schema].[Clientes] ([IdCliente]) ON DELETE CASCADE,
+      CONSTRAINT [FK_Ordens_Fundos_IdFundo] FOREIGN KEY ([IdFundo]) REFERENCES [$schema].[Fundos] ([IdFundo]) ON DELETE CASCADE
+    );
+END
+
+IF OBJECT_ID(N'[$schema].[Posicoes]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [$schema].[Posicoes] (
+      [IdCliente] uniqueidentifier NOT NULL,
+      [IdFundo] uniqueidentifier NOT NULL,
+      [QuantidadeCotas] decimal(38,18) NOT NULL,
+      [RowVersion] bigint NOT NULL,
+      CONSTRAINT [PK_Posicoes] PRIMARY KEY ([IdCliente], [IdFundo]),
+      CONSTRAINT [FK_Posicoes_Clientes_IdCliente] FOREIGN KEY ([IdCliente]) REFERENCES [$schema].[Clientes] ([IdCliente]) ON DELETE CASCADE,
+      CONSTRAINT [FK_Posicoes_Fundos_IdFundo] FOREIGN KEY ([IdFundo]) REFERENCES [$schema].[Fundos] ([IdFundo]) ON DELETE CASCADE
+    );
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_Ordens_IdFundo' AND [object_id] = OBJECT_ID(N'[$schema].[Ordens]'))
+    CREATE INDEX [IX_Ordens_IdFundo] ON [$schema].[Ordens] ([IdFundo]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_Posicoes_IdFundo' AND [object_id] = OBJECT_ID(N'[$schema].[Posicoes]'))
+    CREATE INDEX [IX_Posicoes_IdFundo] ON [$schema].[Posicoes] ([IdFundo]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_Ordens_IdCliente_IdempotencyOperation_IdempotencyKey' AND [object_id] = OBJECT_ID(N'[$schema].[Ordens]'))
+    CREATE UNIQUE INDEX [IX_Ordens_IdCliente_IdempotencyOperation_IdempotencyKey] ON [$schema].[Ordens] ([IdCliente], [IdempotencyOperation], [IdempotencyKey]);
+
+$seedSql
+"@
+}
+
 if ($Engine -in @("mysql", "aurora-mysql")) {
     $mysqlPort = Get-MySqlPort $Port
     $mysqlCmd = Get-Command "mysql" -ErrorAction SilentlyContinue
@@ -234,6 +367,42 @@ if ($Engine -in @("postgres", "aurora-postgres")) {
     finally {
         Remove-Item $temp -Force
         Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    }
+
+    exit 0
+}
+
+if ($Engine -eq "sqlserver") {
+    $sqlPort = Get-SqlServerPort $Port
+    $sqlcmdCmd = Get-Command "sqlcmd" -ErrorAction SilentlyContinue
+    if (-not $sqlcmdCmd) {
+        throw "sqlcmd não encontrado no PATH. Instale SQL Server Command Line Utilities (sqlcmd.exe) ou execute em um ambiente que possua o client."
+    }
+
+    if ($Schema -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+        throw "Schema inválido para SQL Server: '$Schema'. Use apenas letras, números e underscore (_)."
+    }
+
+    $server = $Host
+    if ($sqlPort -gt 0) {
+        $server = "$Host,$sqlPort"
+    }
+
+    $createDbSql = Get-SqlServerCreateDatabaseSql -databaseName $Database
+    $initSql = Get-SqlServerInitSql -databaseName $Database -schemaName $Schema -includeSeed:$includeSeed
+
+    $tempCreateDb = [System.IO.Path]::GetTempFileName()
+    $tempInit = [System.IO.Path]::GetTempFileName()
+
+    [System.IO.File]::WriteAllText($tempCreateDb, $createDbSql, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($tempInit, $initSql, [System.Text.Encoding]::UTF8)
+    try {
+        & $sqlcmdCmd.Source "-S" $server "-U" $Username "-P" $Password "-d" "master" "-i" $tempCreateDb "-b" | Out-Host
+        & $sqlcmdCmd.Source "-S" $server "-U" $Username "-P" $Password "-d" $Database "-i" $tempInit "-b" | Out-Host
+    }
+    finally {
+        Remove-Item $tempCreateDb -Force
+        Remove-Item $tempInit -Force
     }
 
     exit 0
