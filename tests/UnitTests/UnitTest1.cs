@@ -1,3 +1,8 @@
+using CaseGig.Application.Abstractions;
+using CaseGig.Application.DTOs;
+using CaseGig.Application.Exceptions;
+using CaseGig.Application.UseCases;
+using Microsoft.Extensions.Logging.Abstractions;
 using CaseGig.Domain.Entities;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
@@ -215,5 +220,255 @@ public sealed class OrdemRulesTests
     {
         var baseDate = new DateTime(2026, 5, 1);
         return new DateTime(baseDate.Year, baseDate.Month, baseDate.Day, hora, minuto, 0);
+    }
+}
+
+public sealed class IdempotencyUseCaseTests
+{
+    [Fact]
+    public async Task CriarOrdem_ComMesmaIdempotencyKeyEMesmoPayload_DeveRetornarReplayESemCriarNovaOrdem()
+    {
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
+
+        var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 10000m };
+        var fundo = new Fundo
+        {
+            IdFundo = Guid.NewGuid(),
+            Nome = "Fundo",
+            HorarioCorte = new TimeSpan(14, 0, 0),
+            ValorCota = 10m,
+            ValorMinimoAporte = 1m,
+            ValorMinimoPermanencia = 0m,
+            StatusCaptacao = StatusCaptacao.ABERTO
+        };
+
+        var ordens = new InMemoryOrdemRepository();
+        var useCase = new CriarOrdemUseCase(
+            NullLogger<CriarOrdemUseCase>.Instance,
+            new InMemoryTransactionManager(),
+            new InMemoryClienteRepository(cliente),
+            new InMemoryFundoRepository(fundo),
+            new InMemoryPosicaoRepository(),
+            ordens,
+            new OrdemService(),
+            new OrdemProcessamentoService());
+
+        var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
+
+        var first = await useCase.ExecuteAsync(request, agora, "  key-1  ", CancellationToken.None);
+        var second = await useCase.ExecuteAsync(request, agora, "key-1", CancellationToken.None);
+
+        Assert.False(first.IsReplay);
+        Assert.True(second.IsReplay);
+        Assert.Equal(first.Result.IdOrdem, second.Result.IdOrdem);
+        Assert.Single(ordens.Items);
+        Assert.Equal("key-1", ordens.Items[0].IdempotencyKey);
+        Assert.Equal("POST /ordens", ordens.Items[0].IdempotencyOperation);
+        Assert.False(string.IsNullOrWhiteSpace(ordens.Items[0].IdempotencyRequestHash));
+    }
+
+    [Fact]
+    public async Task CriarOrdem_ComMesmaIdempotencyKeyEPayloadDiferente_DeveRetornar409()
+    {
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
+
+        var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 10000m };
+        var fundo = new Fundo
+        {
+            IdFundo = Guid.NewGuid(),
+            Nome = "Fundo",
+            HorarioCorte = new TimeSpan(14, 0, 0),
+            ValorCota = 10m,
+            ValorMinimoAporte = 1m,
+            ValorMinimoPermanencia = 0m,
+            StatusCaptacao = StatusCaptacao.ABERTO
+        };
+
+        var ordens = new InMemoryOrdemRepository();
+        var useCase = new CriarOrdemUseCase(
+            NullLogger<CriarOrdemUseCase>.Instance,
+            new InMemoryTransactionManager(),
+            new InMemoryClienteRepository(cliente),
+            new InMemoryFundoRepository(fundo),
+            new InMemoryPosicaoRepository(),
+            ordens,
+            new OrdemService(),
+            new OrdemProcessamentoService());
+
+        var request1 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
+        var request2 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 11m);
+
+        await useCase.ExecuteAsync(request1, agora, "key-2", CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<ConcurrencyException>(() => useCase.ExecuteAsync(request2, agora, "key-2", CancellationToken.None));
+        Assert.Contains("payload diferente", ex.Message);
+        Assert.Single(ordens.Items);
+    }
+
+    [Fact]
+    public async Task CriarOrdem_SemIdempotencyKey_DeveCriarOrdemNovaEmCadaChamada()
+    {
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
+
+        var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 10000m };
+        var fundo = new Fundo
+        {
+            IdFundo = Guid.NewGuid(),
+            Nome = "Fundo",
+            HorarioCorte = new TimeSpan(14, 0, 0),
+            ValorCota = 10m,
+            ValorMinimoAporte = 1m,
+            ValorMinimoPermanencia = 0m,
+            StatusCaptacao = StatusCaptacao.ABERTO
+        };
+
+        var ordens = new InMemoryOrdemRepository();
+        var useCase = new CriarOrdemUseCase(
+            NullLogger<CriarOrdemUseCase>.Instance,
+            new InMemoryTransactionManager(),
+            new InMemoryClienteRepository(cliente),
+            new InMemoryFundoRepository(fundo),
+            new InMemoryPosicaoRepository(),
+            ordens,
+            new OrdemService(),
+            new OrdemProcessamentoService());
+
+        var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
+
+        var first = await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
+        var second = await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
+
+        Assert.False(first.IsReplay);
+        Assert.False(second.IsReplay);
+        Assert.NotEqual(first.Result.IdOrdem, second.Result.IdOrdem);
+        Assert.Equal(2, ordens.Items.Count);
+    }
+
+    [Fact]
+    public async Task CriarOrdemAgendada_ComMesmaIdempotencyKeyEMesmoPayload_DeveRetornarReplay()
+    {
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
+
+        var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
+        var fundo = new Fundo
+        {
+            IdFundo = Guid.NewGuid(),
+            Nome = "Fundo",
+            HorarioCorte = new TimeSpan(14, 0, 0),
+            ValorCota = 10m,
+            ValorMinimoAporte = 1m,
+            ValorMinimoPermanencia = 0m,
+            StatusCaptacao = StatusCaptacao.ABERTO
+        };
+
+        var ordens = new InMemoryOrdemRepository();
+        var useCase = new CriarOrdemAgendadaUseCase(
+            NullLogger<CriarOrdemAgendadaUseCase>.Instance,
+            new InMemoryTransactionManager(),
+            new InMemoryClienteRepository(cliente),
+            new InMemoryFundoRepository(fundo),
+            new InMemoryPosicaoRepository(),
+            ordens,
+            new OrdemService());
+
+        var request = new CriarOrdemAgendamentoRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m, new DateOnly(2026, 5, 5));
+
+        var first = await useCase.ExecuteAsync(request, agora, "key-3", CancellationToken.None);
+        var second = await useCase.ExecuteAsync(request, agora, "key-3", CancellationToken.None);
+
+        Assert.False(first.IsReplay);
+        Assert.True(second.IsReplay);
+        Assert.Equal(first.Result.IdOrdem, second.Result.IdOrdem);
+        Assert.Single(ordens.Items);
+        Assert.Equal("POST /ordens/agendamento", ordens.Items[0].IdempotencyOperation);
+    }
+
+    private sealed class InMemoryTransactionManager : ITransactionManager
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
+        }
+    }
+
+    private sealed class InMemoryClienteRepository : IClienteRepository
+    {
+        private readonly Cliente _cliente;
+
+        public InMemoryClienteRepository(Cliente cliente)
+        {
+            _cliente = cliente;
+        }
+
+        public Task<Cliente?> GetByIdAsync(Guid idCliente, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Cliente?>(_cliente.IdCliente == idCliente ? _cliente : null);
+        }
+    }
+
+    private sealed class InMemoryFundoRepository : IFundoRepository
+    {
+        private readonly Fundo _fundo;
+
+        public InMemoryFundoRepository(Fundo fundo)
+        {
+            _fundo = fundo;
+        }
+
+        public Task<Fundo?> GetByIdAsync(Guid idFundo, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Fundo?>(_fundo.IdFundo == idFundo ? _fundo : null);
+        }
+    }
+
+    private sealed class InMemoryPosicaoRepository : IPosicaoRepository
+    {
+        private readonly List<Posicao> _items = new();
+
+        public Task<Posicao?> GetByIdAsync(Guid idCliente, Guid idFundo, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_items.FirstOrDefault(x => x.IdCliente == idCliente && x.IdFundo == idFundo));
+        }
+
+        public Task<IReadOnlyList<Posicao>> ListByClienteIdAsync(Guid idCliente, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<Posicao> result = _items.Where(x => x.IdCliente == idCliente).ToList();
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class InMemoryOrdemRepository : IOrdemRepository
+    {
+        public List<Ordem> Items { get; } = new();
+
+        public Task AddAsync(Ordem ordem, CancellationToken cancellationToken)
+        {
+            Items.Add(ordem);
+            return Task.CompletedTask;
+        }
+
+        public Task<Ordem?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
+        {
+            var found = Items
+                .Where(x => x.IdCliente == idCliente && x.IdempotencyOperation == operation && x.IdempotencyKey == key)
+                .OrderByDescending(x => x.DataCriacao)
+                .FirstOrDefault();
+            return Task.FromResult(found);
+        }
+
+        public Task<IReadOnlyList<Ordem>> ListByClienteIdAsync(Guid idCliente, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<Ordem> result = Items.Where(x => x.IdCliente == idCliente).ToList();
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyList<Ordem>> ListAgendadasParaProcessarAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<Ordem> result = Items
+                .Where(x => x.Status == StatusOrdem.AGENDADA && x.DataAgendamento.HasValue && x.DataAgendamento.Value <= agora)
+                .OrderBy(x => x.DataAgendamento)
+                .Take(maximo)
+                .ToList();
+            return Task.FromResult(result);
+        }
     }
 }

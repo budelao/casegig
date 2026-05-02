@@ -1,6 +1,7 @@
 using CaseGig.Api.Contracts;
 using CaseGig.Application.Exceptions;
 using CaseGig.Domain.Exceptions;
+using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using System.Net;
 
@@ -36,6 +37,17 @@ public sealed class ExceptionHandlingMiddleware
         {
             _logger.LogWarning(ex, "API: Conflito de concorrência");
             await WriteErrorAsync(context, HttpStatusCode.Conflict, ex.Message);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "API: Falha ao persistir alterações no banco de dados");
+
+            var env = context.RequestServices.GetService<IHostEnvironment>();
+            var message = env?.IsDevelopment() == true
+                ? (ex.InnerException?.Message ?? ex.Message)
+                : "Erro ao persistir dados no banco de dados.";
+
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, message);
         }
         catch (DbException ex)
         {
