@@ -49,6 +49,8 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new DateOnlyDdMmYyyyJsonConverter());
     });
 
+builder.Services.Configure<ObservabilityLoggingOptions>(builder.Configuration.GetSection("Observability:Logging"));
+
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
@@ -148,12 +150,13 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             }
         }
 
+        string? sourceFromScope = null;
         List<object?>? scopes = null;
         if (_options.IncludeScopes && scopeProvider is not null)
         {
             scopes = new List<object?>();
             scopeProvider.ForEachScope(
-                static (scope, list) =>
+                (scope, list) =>
                 {
                     if (scope is IEnumerable<KeyValuePair<string, object?>> scopeValues)
                     {
@@ -161,6 +164,10 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
                         foreach (var kvp in scopeValues)
                         {
                             scopeDict[kvp.Key] = kvp.Value;
+                            if (sourceFromScope is null && string.Equals(kvp.Key, "Source", StringComparison.OrdinalIgnoreCase) && kvp.Value is string s)
+                            {
+                                sourceFromScope = s;
+                            }
                         }
                         list.Add(scopeDict);
                         return;
@@ -171,12 +178,13 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
                 scopes);
         }
 
+        var source = NormalizeSource(sourceFromScope) ?? GetSourceFromCategory(logEntry.Category);
         var payload = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["EventId"] = logEntry.EventId.Id,
             ["LogLevel"] = logEntry.LogLevel.ToString(),
             ["Category"] = logEntry.Category,
-            ["Source"] = GetSource(logEntry.Category),
+            ["Source"] = source,
             ["Message"] = message,
             ["State"] = state,
             ["Scopes"] = scopes
@@ -198,7 +206,7 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             return;
         }
 
-        var color = GetColor(logEntry.Category);
+        var color = GetColor(source);
 
         lock (ConsoleLock)
         {
@@ -215,9 +223,9 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
         }
     }
 
-    private ConsoleColor GetColor(string category)
+    private ConsoleColor GetColor(string source)
     {
-        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+        if (string.Equals(source, "WORKER", StringComparison.OrdinalIgnoreCase))
         {
             return _options.WorkerColor;
         }
@@ -225,7 +233,7 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
         return _options.ApiColor;
     }
 
-    private static string GetSource(string category)
+    private static string GetSourceFromCategory(string category)
     {
         if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
         {
@@ -233,6 +241,26 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
         }
 
         return "API";
+    }
+
+    private static string? NormalizeSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return null;
+        }
+
+        if (string.Equals(source, "WORKER", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WORKER";
+        }
+
+        if (string.Equals(source, "API", StringComparison.OrdinalIgnoreCase))
+        {
+            return "API";
+        }
+
+        return source;
     }
 }
 
