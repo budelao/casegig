@@ -13,7 +13,9 @@ using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Globalization;
+using System.Data.Common;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -22,6 +24,7 @@ using System.Text.Json.Serialization;
 Console.OutputEncoding = Encoding.UTF8;
 
 var builder = WebApplication.CreateBuilder(args);
+var recreateDb = args.Any(x => string.Equals(x, "--recreate-db", StringComparison.OrdinalIgnoreCase));
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole(options =>
@@ -73,6 +76,8 @@ builder.Services.AddSwaggerGen(options =>
         Pattern = "^\\d{2}/\\d{2}/\\d{4}$",
         Example = new OpenApiString("31/12/2026")
     });
+
+    options.OperationFilter<IdempotencyHeadersOperationFilter>();
 });
 
 builder.Services.AddApplication();
@@ -87,18 +92,33 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    using var scope = app.Services.CreateScope();
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Migration");
-    try
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
+    var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentDbContext>();
+
+    if (recreateDb && app.Environment.IsDevelopment())
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentDbContext>();
+        logger.LogWarning("Recriando banco de dados por solicitação (--recreate-db)");
+        dbContext.Database.EnsureDeleted();
         dbContext.Database.Migrate();
     }
-    catch (Exception ex)
+    else if (app.Environment.IsDevelopment() && HasMigrationsHistoryTable(dbContext))
     {
-        logger.LogError(ex, "Falha ao aplicar migrations");
+        try
+        {
+            dbContext.Database.Migrate();
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex, "Falha ao aplicar migrations no startup");
+            throw;
+        }
     }
+
+    EnsureRequiredSchema(dbContext);
 }
 
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -111,6 +131,158 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static void EnsureRequiredSchema(InvestmentDbContext dbContext)
+{
+    var providerName = dbContext.Database.ProviderName ?? string.Empty;
+    if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+    {
+        EnsureMySqlColumnExists(dbContext, "Ordens", "IdempotencyKey");
+        EnsureMySqlColumnExists(dbContext, "Ordens", "IdempotencyOperation");
+        EnsureMySqlColumnExists(dbContext, "Ordens", "IdempotencyRequestHash");
+        return;
+    }
+}
+
+static bool HasMigrationsHistoryTable(InvestmentDbContext dbContext)
+{
+    var providerName = dbContext.Database.ProviderName ?? string.Empty;
+    if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+    {
+        return MySqlTableExists(dbContext, "__EFMigrationsHistory");
+    }
+
+    return true;
+}
+
+static bool MySqlTableExists(InvestmentDbContext dbContext, string tableName)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldClose = connection.State != System.Data.ConnectionState.Open;
+    try
+    {
+        if (shouldClose)
+        {
+            connection.Open();
+        }
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName";
+        AddParameter(cmd, "@tableName", tableName);
+        var count = Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return count > 0;
+    }
+    finally
+    {
+        if (shouldClose)
+        {
+            connection.Close();
+        }
+    }
+}
+
+static void EnsureMySqlColumnExists(InvestmentDbContext dbContext, string tableName, string columnName)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldClose = connection.State != System.Data.ConnectionState.Open;
+    try
+    {
+        if (shouldClose)
+        {
+            connection.Open();
+        }
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND COLUMN_NAME = @columnName";
+        AddParameter(cmd, "@tableName", tableName);
+        AddParameter(cmd, "@columnName", columnName);
+        var count = Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        if (count > 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Banco de dados desatualizado: coluna '{columnName}' não encontrada em '{tableName}'. " +
+            $"Atualize o schema (aplicando migrations em um banco controlado por EF) ou recrie o banco usando o script scripts/provision-db.ps1.");
+    }
+    finally
+    {
+        if (shouldClose)
+        {
+            connection.Close();
+        }
+    }
+}
+
+static void AddParameter(DbCommand command, string name, object? value)
+{
+    var parameter = command.CreateParameter();
+    parameter.ParameterName = name;
+    parameter.Value = value ?? DBNull.Value;
+    command.Parameters.Add(parameter);
+}
+
+sealed class IdempotencyHeadersOperationFilter : IOperationFilter
+{
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        if (!string.Equals(context.ApiDescription.HttpMethod, "POST", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var relativePath = context.ApiDescription.RelativePath ?? string.Empty;
+        if (!IsIdempotentEndpoint(relativePath))
+        {
+            return;
+        }
+
+        operation.Parameters ??= new List<OpenApiParameter>();
+
+        var alreadyDeclared = operation.Parameters.Any(p =>
+            string.Equals(p.In?.ToString(), "Header", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(p.Name, "Idempotency-Key", StringComparison.OrdinalIgnoreCase));
+
+        if (!alreadyDeclared)
+        {
+            operation.Parameters.Add(new OpenApiParameter
+            {
+                Name = "Idempotency-Key",
+                In = ParameterLocation.Header,
+                Required = false,
+                Description = "Chave de idempotência. Repetir a mesma chave com o mesmo payload retorna a primeira resposta; com payload diferente retorna 409.",
+                Schema = new OpenApiSchema { Type = "string" }
+            });
+        }
+
+        if (operation.Responses.TryGetValue("200", out var okResponse))
+        {
+            okResponse.Headers ??= new Dictionary<string, OpenApiHeader>(StringComparer.OrdinalIgnoreCase);
+            if (!okResponse.Headers.ContainsKey("Idempotency-Replayed"))
+            {
+                okResponse.Headers["Idempotency-Replayed"] = new OpenApiHeader
+                {
+                    Description = "Indica replay de idempotência (true quando a ordem não foi criada novamente).",
+                    Schema = new OpenApiSchema { Type = "string" }
+                };
+            }
+        }
+    }
+
+    private static bool IsIdempotentEndpoint(string relativePath)
+    {
+        var path = relativePath;
+        var idx = path.IndexOf('?', StringComparison.Ordinal);
+        if (idx >= 0)
+        {
+            path = path[..idx];
+        }
+
+        path = path.Trim('/').ToLowerInvariant();
+        return path is "ordens" or "ordens/agendamento";
+    }
+}
 
 sealed class ColoredJsonConsoleFormatterOptions : ConsoleFormatterOptions
 {
