@@ -62,6 +62,10 @@ public sealed class InvestmentDbContext : DbContext
             entity.Property(x => x.QuantidadeCotas).HasPrecision(38, 18);
             entity.Property(x => x.DataCriacao).IsRequired();
             entity.Property(x => x.RowVersion).IsConcurrencyToken();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+            entity.Property(x => x.IdempotencyOperation).HasMaxLength(80);
+            entity.Property(x => x.IdempotencyRequestHash).HasMaxLength(64);
+            entity.HasIndex(x => new { x.IdCliente, x.IdempotencyOperation, x.IdempotencyKey }).IsUnique();
 
             entity.HasOne(x => x.Cliente)
                 .WithMany(x => x.Ordens)
