@@ -122,6 +122,17 @@ As respostas seguem o padrão:
 }
 ```
 
+### Idempotência (POST)
+
+Para evitar criação duplicada de ordens em caso de retry (timeout, falha de rede, etc.), os endpoints `POST` aceitam o header:
+
+- `Idempotency-Key: <string>`
+
+Comportamento:
+
+- Mesma `Idempotency-Key` + mesmo payload (para o mesmo `idCliente` e endpoint) → a API retorna o resultado da primeira execução e **não cria uma nova ordem** (retorna `200` e o header `Idempotency-Replayed: true`).
+- Mesma `Idempotency-Key` + payload diferente → a API retorna `409 Conflict`.
+
 ## Swagger
 
 Com `ASPNETCORE_ENVIRONMENT=Development`, o Swagger UI fica em:

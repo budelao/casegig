@@ -14,6 +14,9 @@ public sealed class Ordem
     public DateTime? DataProcessamento { get; set; }
     public StatusOrdem Status { get; set; }
     public long RowVersion { get; set; }
+    public string? IdempotencyKey { get; set; }
+    public string? IdempotencyOperation { get; set; }
+    public string? IdempotencyRequestHash { get; set; }
 
     public Cliente? Cliente { get; set; }
     public Fundo? Fundo { get; set; }
