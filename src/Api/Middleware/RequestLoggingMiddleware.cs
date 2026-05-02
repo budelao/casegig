@@ -29,27 +29,51 @@ public sealed class RequestLoggingMiddleware
             var startedAt = System.Diagnostics.Stopwatch.StartNew();
 
             _logger.LogInformation(
-                "API: HTTP request started. Method={Method} Path={Path} QueryString={QueryString} ContentLength={ContentLength}",
+                "API: Request iniciada. Method={Method} Path={Path} QueryString={QueryString} ContentLength={ContentLength} CorrelationId={CorrelationId}",
                 context.Request.Method,
                 context.Request.Path.Value,
                 context.Request.QueryString.Value,
-                context.Request.ContentLength);
+                context.Request.ContentLength,
+                correlationId);
 
             try
             {
                 await _next(context);
 
-                _logger.LogInformation(
-                    "API: HTTP request finished. StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
-                    context.Response.StatusCode,
-                    startedAt.ElapsedMilliseconds);
+                var elapsedMs = startedAt.ElapsedMilliseconds;
+                var statusCode = context.Response.StatusCode;
+                if (statusCode >= StatusCodes.Status500InternalServerError)
+                {
+                    _logger.LogError(
+                        "API: Request finalizada com erro. StatusCode={StatusCode} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                        statusCode,
+                        elapsedMs,
+                        correlationId);
+                }
+                else if (statusCode >= StatusCodes.Status400BadRequest)
+                {
+                    _logger.LogWarning(
+                        "API: Request finalizada com falha. StatusCode={StatusCode} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                        statusCode,
+                        elapsedMs,
+                        correlationId);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "API: Request finalizada. StatusCode={StatusCode} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                        statusCode,
+                        elapsedMs,
+                        correlationId);
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(
                     ex,
-                    "API: HTTP request failed. ElapsedMs={ElapsedMs}",
-                    startedAt.ElapsedMilliseconds);
+                    "API: Request falhou por exceção não tratada. ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                    startedAt.ElapsedMilliseconds,
+                    correlationId);
                 throw;
             }
         }

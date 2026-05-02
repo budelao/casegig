@@ -115,7 +115,42 @@ O seed inicial é criado via migrations e inclui:
 
 A aplicação utiliza logs estruturados em formato JSON, permitindo rastreabilidade das operações e fácil integração futura com ferramentas de monitoramento como Splunk, ELK ou CloudWatch.
 
+### Logging de Requisições
+
+A aplicação possui middleware de logging que captura todas as requisições HTTP, incluindo tempo de execução e identificador de correlação, permitindo rastreamento completo das operações.
+
 ## Uso de IA
 
 - Apoio na criação incremental da solução, alinhado aos documentos em `docs/`
 - Geração e refinamento de estrutura, camadas, endpoints e testes
+
+## 🔍 Observabilidade
+
+A aplicação implementa logs estruturados em formato JSON, permitindo rastreabilidade e diagnóstico das operações.
+
+### Logging de Requisições
+
+Foi implementado um middleware responsável por capturar todas as requisições HTTP, registrando:
+
+- Método HTTP e endpoint
+- Status da resposta
+- Tempo de execução
+- CorrelationId (identificador único por requisição)
+
+Isso permite rastrear o fluxo completo de uma operação, desde a entrada da requisição até o processamento final.
+
+### Logging de Processamento
+
+O processamento assíncrono de ordens também é monitorado por meio de logs estruturados, incluindo:
+
+- Ordens processadas
+- Status da execução (sucesso ou falha)
+- Erros ocorridos
+
+### Evolução
+
+Em um cenário produtivo, esses logs poderiam ser integrados com ferramentas como:
+
+- AWS CloudWatch
+- ELK Stack
+- Splunk

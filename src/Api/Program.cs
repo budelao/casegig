@@ -99,8 +99,8 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 
