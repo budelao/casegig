@@ -19,7 +19,7 @@ API REST para criação e processamento de ordens de investimento em fundos, com
 ### Pré-requisitos
 
 - .NET 8 SDK
-- MySQL 8.x acessível (ex.: `localhost:3306`)
+- Banco relacional acessível (ex.: MySQL `localhost:3306`)
 
 ### Configuração
 
@@ -33,6 +33,32 @@ Exemplo (PowerShell):
 ```powershell
 $env:ConnectionStrings__MySql = "server=localhost;port=3306;database=casegig;user=root;password=SUA_SENHA;AllowUserVariables=True"
 ```
+
+### Provisionar banco (script)
+
+Existe um script único para criar **database**, **schema/tabelas** e (opcionalmente) fazer **seed** de dados:
+
+- Arquivo: `./scripts/provision-db.ps1`
+- Engines suportadas: `mysql`, `aurora-mysql`, `postgres`, `aurora-postgres`, `sqlserver`
+- Requisitos (conforme a engine): `mysql` (MySQL client), `psql` (PostgreSQL client) ou `sqlcmd` (SQL Server Command Line Utilities) disponíveis no `PATH`.
+
+Exemplos:
+
+```powershell
+# MySQL
+.\scripts\provision-db.ps1 -Engine mysql -Host localhost -Port 3306 -Database casegig -Username root -Password "SUA_SENHA"
+
+# Postgres (schema default: public)
+.\scripts\provision-db.ps1 -Engine postgres -Host localhost -Port 5432 -Database casegig -Username postgres -Password "SUA_SENHA" -Schema public
+
+# SQL Server (schema default: dbo)
+.\scripts\provision-db.ps1 -Engine sqlserver -Host localhost -Port 1433 -Database casegig -Username sa -Password "SUA_SENHA" -Schema dbo
+
+# Sem seed
+.\scripts\provision-db.ps1 -Engine mysql -Host localhost -Port 3306 -Database casegig -Username root -Password "SUA_SENHA" -SkipSeed
+```
+
+Observação: a aplicação está configurada para rodar com **MySQL** (EF Core + Pomelo). Para usar outro banco em runtime, é necessário trocar o provider/configuração no projeto.
 
 ### Build / Execução
 
