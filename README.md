@@ -16,32 +16,48 @@ API REST para criação e processamento de ordens de investimento em fundos, com
 
 ## Como executar
 
-1) Configure um MySQL acessível (ex.: `localhost:3306`).
+### Pré-requisitos
 
-2) Ajuste a connection string em [appsettings.json](file:///c:/projetos/CaseGig/src/Api/appsettings.json):
+- .NET 8 SDK
+- MySQL 8.x acessível (ex.: `localhost:3306`)
 
-- `ConnectionStrings:MySql`
+### Configuração
 
-3) Restaurar / compilar:
+Configure a connection string do MySQL via variável de ambiente (recomendado) ou em `appsettings.Development.json` (não versionar segredos).
 
-```bash
-./.dotnet/dotnet restore
-./.dotnet/dotnet build
+- Chave: `ConnectionStrings:MySql`
+- Observação: o projeto valida e falha no startup se a connection string estiver com `CHANGE_ME`.
+
+Exemplo (PowerShell):
+
+```powershell
+$env:ConnectionStrings__MySql = "server=localhost;port=3306;database=casegig;user=root;password=SUA_SENHA;AllowUserVariables=True"
 ```
 
-4) Rodar a API:
+### Build / Execução
+
+Restaurar / compilar:
 
 ```bash
-./.dotnet/dotnet run --project src/Api
+dotnet restore
+dotnet build
 ```
 
-Em ambiente Development, a API tenta aplicar migrations automaticamente no startup.
+Rodar a API:
+
+```bash
+dotnet run --project ./src/Api/CaseGig.Api.csproj
+```
+
+Em ambiente `Development`, a API tenta aplicar migrations automaticamente no startup.
 
 ## Endpoints
 
-### Criar ordem
+Base URL (launchSettings padrão): `http://localhost:5196`
 
-`POST /api/ordens`
+### Criar ordem (imediata)
+
+`POST /ordens`
 
 Exemplo (APORTE por quantidade de cotas):
 
@@ -65,19 +81,64 @@ Exemplo (RESGATE por quantidade de cotas):
 }
 ```
 
+### Criar ordem (agendada)
+
+`POST /ordens/agendamento`
+
+Observação:
+
+- `dataAgendamento` é uma data (sem hora) no formato `dd/MM/yyyy`.
+- A data/hora efetiva de execução é calculada como `dataAgendamento` + `HorarioCorte` do fundo.
+
+Exemplo:
+
+```json
+{
+  "idCliente": "11111111-1111-1111-1111-111111111111",
+  "idFundo": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "tipoOperacao": "APORTE",
+  "quantidadeCotas": 100.0,
+  "dataAgendamento": "04/05/2026"
+}
+```
+
 ### Consultar ordens
 
-`GET /api/ordens?idCliente={guid}`
+`GET /ordens?idCliente={guid}`
 
 ### Consultar posição
 
-`GET /api/posicoes/{idCliente}`
+`GET /posicoes/{idCliente}`
+
+### Envelope de resposta
+
+As respostas seguem o padrão:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "errors": []
+}
+```
 
 ## Swagger
 
 Com `ASPNETCORE_ENVIRONMENT=Development`, o Swagger UI fica em:
 
 - `/swagger`
+
+## Worker (ordens agendadas)
+
+O worker (`HostedService`) processa periodicamente ordens elegíveis:
+
+- `Status = AGENDADA`
+- `DataAgendamento <= agora`
+
+Configurações em `appsettings.json`:
+
+- `Worker:IntervalSeconds` (default 30)
+- `Worker:BatchSize` (default 20)
 
 ## Arquitetura
 
@@ -113,7 +174,31 @@ O seed inicial é criado via migrations e inclui:
 
 ## Observabilidade
 
-A aplicação utiliza logs estruturados em formato JSON, permitindo rastreabilidade das operações e fácil integração futura com ferramentas de monitoramento como Splunk, ELK ou CloudWatch.
+A aplicação utiliza logs estruturados em formato JSON no console, permitindo rastreabilidade e diagnóstico das operações.
+
+### Logging de Requisições
+
+O middleware registra:
+
+- Início e fim da request (método, rota, status code, tempo)
+- `CorrelationId` (retornado também no header `X-Correlation-Id`)
+
+Configuração (em `appsettings.json`):
+
+- `Observability:Logging:Enabled`
+- `Observability:Logging:AddCorrelationIdHeader`
+- `Observability:Logging:LogRequestHeaders` / `RequestHeaderAllowList`
+- `Observability:Logging:LogResponseHeaders` / `ResponseHeaderAllowList`
+
+### Integrações (preparado)
+
+Existe estrutura de configuração para futura exportação para:
+
+- Splunk (HecEndpoint/Token)
+- Grafana Loki (LokiEndpoint/Token)
+- Datadog (Site/ApiKey)
+
+Por enquanto, os logs continuam indo para o console.
 
 ## Uso de IA
 
