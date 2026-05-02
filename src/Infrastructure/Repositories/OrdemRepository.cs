@@ -21,6 +21,15 @@ public sealed class OrdemRepository : IOrdemRepository
         return Task.CompletedTask;
     }
 
+    public async Task<Ordem?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Ordens
+            .AsNoTracking()
+            .Where(x => x.IdCliente == idCliente && x.IdempotencyOperation == operation && x.IdempotencyKey == key)
+            .OrderByDescending(x => x.DataCriacao)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Ordem>> ListByClienteIdAsync(Guid idCliente, CancellationToken cancellationToken)
     {
         return await _dbContext.Ordens
