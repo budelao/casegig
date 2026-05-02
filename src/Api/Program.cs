@@ -146,7 +146,7 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
             state = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (var kvp in stateValues)
             {
-                state[kvp.Key] = kvp.Value;
+                state[kvp.Key] = ToJsonSafe(kvp.Value);
             }
         }
 
@@ -163,8 +163,9 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
                         var scopeDict = new Dictionary<string, object?>(StringComparer.Ordinal);
                         foreach (var kvp in scopeValues)
                         {
-                            scopeDict[kvp.Key] = kvp.Value;
-                            if (sourceFromScope is null && string.Equals(kvp.Key, "Source", StringComparison.OrdinalIgnoreCase) && kvp.Value is string s)
+                            var safeValue = ToJsonSafe(kvp.Value);
+                            scopeDict[kvp.Key] = safeValue;
+                            if (sourceFromScope is null && string.Equals(kvp.Key, "Source", StringComparison.OrdinalIgnoreCase) && safeValue is string s)
                             {
                                 sourceFromScope = s;
                             }
@@ -261,6 +262,76 @@ sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
         }
 
         return source;
+    }
+
+    private static object? ToJsonSafe(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement)
+        {
+            return value;
+        }
+
+        if (value is string || value is bool)
+        {
+            return value;
+        }
+
+        if (value is byte || value is sbyte || value is short || value is ushort || value is int || value is uint || value is long || value is ulong)
+        {
+            return value;
+        }
+
+        if (value is float || value is double || value is decimal)
+        {
+            return value;
+        }
+
+        if (value is Guid || value is DateTime || value is DateTimeOffset || value is TimeSpan)
+        {
+            return value;
+        }
+
+        if (value is Enum e)
+        {
+            return e.ToString();
+        }
+
+        if (value is Type t)
+        {
+            return t.FullName ?? t.Name;
+        }
+
+        if (value is Exception ex)
+        {
+            return ex.ToString();
+        }
+
+        if (value is IEnumerable<KeyValuePair<string, object?>> dictValues)
+        {
+            var dict = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var kvp in dictValues)
+            {
+                dict[kvp.Key] = ToJsonSafe(kvp.Value);
+            }
+            return dict;
+        }
+
+        if (value is System.Collections.IEnumerable enumerable)
+        {
+            var list = new List<object?>();
+            foreach (var item in enumerable)
+            {
+                list.Add(ToJsonSafe(item));
+            }
+            return list;
+        }
+
+        return value.ToString();
     }
 }
 
