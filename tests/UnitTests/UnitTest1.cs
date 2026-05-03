@@ -2,6 +2,7 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
+using CaseGig.Application.Operations;
 using CaseGig.Application.UseCases;
 using Microsoft.Extensions.Logging.Abstractions;
 using CaseGig.Domain.Entities;
@@ -244,6 +245,13 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -252,8 +260,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryPosicaoRepository(),
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
 
@@ -287,6 +294,13 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -295,8 +309,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryPosicaoRepository(),
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request1 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         var request2 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 11m);
@@ -325,6 +338,13 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -333,8 +353,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryPosicaoRepository(),
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
 
@@ -365,6 +384,13 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemAgendadaUseCase(
             NullLogger<CriarOrdemAgendadaUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -373,7 +399,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryPosicaoRepository(),
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService());
+            handlerFactory);
 
         var request = new CriarOrdemAgendamentoRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m, new DateOnly(2026, 5, 5));
 
@@ -409,6 +435,13 @@ public sealed class CriarOrdemUseCaseFlowTests
 
         var posicoes = new InMemoryPosicaoRepository();
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -417,8 +450,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             posicoes,
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         var result = await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
@@ -453,6 +485,13 @@ public sealed class CriarOrdemUseCaseFlowTests
         var posicoes = new InMemoryPosicaoRepository(posicao);
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -461,8 +500,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             posicoes,
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.RESGATE, 5m);
         await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
@@ -491,6 +529,13 @@ public sealed class CriarOrdemUseCaseFlowTests
         };
 
         var ordens = new InMemoryOrdemRepository();
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -499,8 +544,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryPosicaoRepository(),
             ordens,
             new IdempotencyService(ordens),
-            new OrdemService(),
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         await Assert.ThrowsAsync<BusinessRuleException>(() => useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None));
@@ -541,6 +585,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -548,7 +599,7 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
@@ -591,6 +642,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -598,7 +656,7 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
@@ -640,6 +698,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
+        var ordemService = new OrdemService();
+        var processamentoService = new OrdemProcessamentoService();
+        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
+        {
+            new AporteOrdemOperationHandler(ordemService, processamentoService),
+            new ResgateOrdemOperationHandler(ordemService, processamentoService)
+        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -647,7 +712,7 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new OrdemProcessamentoService());
+            handlerFactory);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
