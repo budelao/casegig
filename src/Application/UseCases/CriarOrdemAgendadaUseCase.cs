@@ -46,7 +46,7 @@ public sealed class CriarOrdemAgendadaUseCase
         CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "API: Executando caso de uso: criar ordem agendada. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas} DataAgendamento={DataAgendamento}",
+            "Executando caso de uso: criar ordem agendada. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas} DataAgendamento={DataAgendamento}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
@@ -124,7 +124,7 @@ public sealed class CriarOrdemAgendadaUseCase
             throw;
         }
 
-        _logger.LogInformation("API: Ordem agendada criada. Ordem={IdOrdem} Status={Status} DataAgendamento={DataAgendamento}", result!.IdOrdem, result!.Status, result!.DataAgendamento);
+        _logger.LogInformation("Ordem agendada criada. Ordem={IdOrdem} Status={Status} DataAgendamento={DataAgendamento}", result!.IdOrdem, result!.Status, result!.DataAgendamento);
         return new CriarOrdemExecutionResult(result!, false);
     }
 
