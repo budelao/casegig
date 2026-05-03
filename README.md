@@ -229,13 +229,31 @@ Configuração (em `appsettings.json`):
 
 ### Integrações (preparado)
 
-Existe estrutura de configuração para futura exportação para:
+Existe estrutura de configuração para exportação (quando habilitado) para:
 
 - Splunk (HecEndpoint/Token)
 - Grafana Loki (LokiEndpoint/Token)
 - Datadog (Site/ApiKey)
 
-Por enquanto, os logs continuam indo para o console.
+Além da saída no console/terminal, a API/worker pode enviar logs estruturados via HTTP para as integrações configuradas.
+
+#### Export de logs (HTTP) + Polly
+
+Quando uma integração está habilitada e com credenciais válidas (sem `CHANGE_ME`), a aplicação:
+
+- Enfileira eventos de log e exporta em background (não bloqueia request/worker)
+- Usa Polly nos HttpClients para resiliência:
+  - timeout
+  - retry com backoff + jitter
+  - circuit breaker
+
+Chaves (em `appsettings.json` / variáveis de ambiente):
+
+- `Observability:Logging:Export:Splunk:Enabled`, `HecEndpoint`, `Token`
+- `Observability:Logging:Export:Grafana:Enabled`, `LokiEndpoint`, `Token`
+- `Observability:Logging:Export:Datadog:Enabled`, `Site`, `ApiKey`
+
+Observação: a saída “pretty” do terminal é apenas para facilitar leitura local; o export usa payload estruturado.
 
 ## Uso de IA
 

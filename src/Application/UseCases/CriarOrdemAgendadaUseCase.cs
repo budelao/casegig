@@ -1,13 +1,12 @@
 using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
+using CaseGig.Application.Idempotency;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using CaseGig.Domain.Services;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace CaseGig.Application.UseCases;
 
@@ -19,6 +18,7 @@ public sealed class CriarOrdemAgendadaUseCase
     private readonly IFundoRepository _fundoRepository;
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
+    private readonly IdempotencyService _idempotencyService;
     private readonly OrdemService _ordemService;
 
     public CriarOrdemAgendadaUseCase(
@@ -28,6 +28,7 @@ public sealed class CriarOrdemAgendadaUseCase
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
+        IdempotencyService idempotencyService,
         OrdemService ordemService)
     {
         _logger = logger;
@@ -36,6 +37,7 @@ public sealed class CriarOrdemAgendadaUseCase
         _fundoRepository = fundoRepository;
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
+        _idempotencyService = idempotencyService;
         _ordemService = ordemService;
     }
 
@@ -53,20 +55,21 @@ public sealed class CriarOrdemAgendadaUseCase
             request.QuantidadeCotas,
             request.DataAgendamento);
 
-        var normalizedKey = NormalizeIdempotencyKey(idempotencyKey);
+        var normalizedKey = _idempotencyService.NormalizeKey(idempotencyKey);
         var idempotencyOperation = "POST /ordens/agendamento";
         var idempotencyRequestHash = normalizedKey is null ? null : ComputeRequestHash(request);
 
         if (normalizedKey is not null)
         {
-            var existing = await _ordemRepository.GetByIdempotencyAsync(request.IdCliente, idempotencyOperation, normalizedKey, cancellationToken);
+            var existing = await _idempotencyService.TryGetReplayAsync(
+                request.IdCliente,
+                idempotencyOperation,
+                normalizedKey,
+                idempotencyRequestHash!,
+                cancellationToken);
+
             if (existing is not null)
             {
-                if (!string.Equals(existing.IdempotencyRequestHash, idempotencyRequestHash, StringComparison.Ordinal))
-                {
-                    throw new ConcurrencyException("Idempotency-Key já utilizada com payload diferente.");
-                }
-
                 return new CriarOrdemExecutionResult(Map(existing), true);
             }
         }
@@ -114,8 +117,14 @@ public sealed class CriarOrdemAgendadaUseCase
         {
             if (normalizedKey is not null)
             {
-                var existing = await _ordemRepository.GetByIdempotencyAsync(request.IdCliente, idempotencyOperation, normalizedKey, cancellationToken);
-                if (existing is not null && string.Equals(existing.IdempotencyRequestHash, idempotencyRequestHash, StringComparison.Ordinal))
+                var existing = await _idempotencyService.TryGetReplayAfterFailureAsync(
+                    request.IdCliente,
+                    idempotencyOperation,
+                    normalizedKey,
+                    idempotencyRequestHash!,
+                    cancellationToken);
+
+                if (existing is not null)
                 {
                     return new CriarOrdemExecutionResult(Map(existing), true);
                 }
@@ -142,17 +151,9 @@ public sealed class CriarOrdemAgendadaUseCase
             ordem.DataProcessamento);
     }
 
-    private static string? NormalizeIdempotencyKey(string? key)
-    {
-        var trimmed = key?.Trim();
-        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
-    }
-
     private static string ComputeRequestHash(CriarOrdemAgendamentoRequestDto request)
     {
         var payload = $"{request.IdCliente:N}|{request.IdFundo:N}|{request.TipoOperacao}|{request.QuantidadeCotas.ToString(CultureInfo.InvariantCulture)}|{request.DataAgendamento:yyyy-MM-dd}";
-        var bytes = Encoding.UTF8.GetBytes(payload);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
+        return RequestHash.ComputeSha256Hex(payload);
     }
 }

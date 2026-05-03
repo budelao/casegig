@@ -1,6 +1,7 @@
 using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
+using CaseGig.Application.Idempotency;
 using CaseGig.Application.UseCases;
 using Microsoft.Extensions.Logging.Abstractions;
 using CaseGig.Domain.Entities;
@@ -250,6 +251,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
@@ -292,6 +294,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
@@ -329,6 +332,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
@@ -368,6 +372,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService());
 
         var request = new CriarOrdemAgendamentoRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m, new DateOnly(2026, 5, 5));
@@ -411,6 +416,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             posicoes,
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
@@ -454,6 +460,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             posicoes,
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
@@ -491,6 +498,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
+            new IdempotencyService(ordens),
             new OrdemService(),
             new OrdemProcessamentoService());
 
