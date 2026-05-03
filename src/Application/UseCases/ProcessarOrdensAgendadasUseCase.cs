@@ -1,8 +1,8 @@
 using CaseGig.Application.Abstractions;
 using CaseGig.Application.Exceptions;
+using CaseGig.Application.Operations;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
-using CaseGig.Domain.Services;
 using Microsoft.Extensions.Logging;
 
 namespace CaseGig.Application.UseCases;
@@ -15,7 +15,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
     private readonly IFundoRepository _fundoRepository;
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
-    private readonly OrdemProcessamentoService _processamentoService;
+    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public ProcessarOrdensAgendadasUseCase(
         ILogger<ProcessarOrdensAgendadasUseCase> logger,
@@ -24,7 +24,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
-        OrdemProcessamentoService processamentoService)
+        OrdemOperationHandlerFactory operationHandlerFactory)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -32,7 +32,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
         _fundoRepository = fundoRepository;
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
-        _processamentoService = processamentoService;
+        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<ProcessamentoResumo> ExecuteAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
@@ -74,23 +74,13 @@ public sealed class ProcessarOrdensAgendadasUseCase
 
                     try
                     {
-                        _processamentoService.PrepararParaProcessamento(ordem, agora);
-
-                        if (ordem.TipoOperacao == TipoOperacao.APORTE)
+                        if (ordem.TipoOperacao == TipoOperacao.RESGATE && posicao is null)
                         {
-                            _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao);
-                        }
-                        else
-                        {
-                            if (posicao is null)
-                            {
-                                throw new BusinessRuleException("Cotas insuficientes para realizar o resgate.");
-                            }
-
-                            _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
+                            throw new BusinessRuleException("Cotas insuficientes para realizar o resgate.");
                         }
 
-                        _processamentoService.Concluir(ordem, agora);
+                        var handler = _operationHandlerFactory.Get(ordem.TipoOperacao);
+                        handler.Process(ordem, cliente, fundo, posicao, agora);
                         processadas++;
 
                         _logger.LogInformation(
@@ -100,7 +90,8 @@ public sealed class ProcessarOrdensAgendadasUseCase
                     }
                     catch (BusinessRuleException ex)
                     {
-                        _processamentoService.Rejeitar(ordem, agora);
+                        ordem.Status = StatusOrdem.REJEITADA;
+                        ordem.DataProcessamento = agora;
                         rejeitadas++;
 
                         _logger.LogWarning(
