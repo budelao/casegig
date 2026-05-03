@@ -30,17 +30,17 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (BusinessRuleException ex)
         {
-            _logger.LogWarning(ex, "API: Falha de validação de negócio");
+            _logger.LogWarning(ex, "Falha de validação de negócio");
             await WriteErrorAsync(context, HttpStatusCode.UnprocessableEntity, ex.Message);
         }
         catch (ConcurrencyException ex)
         {
-            _logger.LogWarning(ex, "API: Conflito de concorrência");
+            _logger.LogWarning(ex, "Conflito de concorrência");
             await WriteErrorAsync(context, HttpStatusCode.Conflict, ex.Message);
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "API: Falha ao persistir alterações no banco de dados");
+            _logger.LogError(ex, "Falha ao persistir alterações no banco de dados");
 
             var env = context.RequestServices.GetService<IHostEnvironment>();
             var message = env?.IsDevelopment() == true
@@ -51,7 +51,7 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (DbException ex)
         {
-            _logger.LogError(ex, "API: Erro de banco de dados");
+            _logger.LogError(ex, "Erro de banco de dados");
 
             var env = context.RequestServices.GetService<IHostEnvironment>();
             var message = env?.IsDevelopment() == true
@@ -62,7 +62,7 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "API: Erro não tratado");
+            _logger.LogError(ex, "Erro não tratado");
 
             var env = context.RequestServices.GetService<IHostEnvironment>();
             var message = env?.IsDevelopment() == true
