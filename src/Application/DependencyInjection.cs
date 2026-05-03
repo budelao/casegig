@@ -1,3 +1,4 @@
+using CaseGig.Application.Idempotency;
 using CaseGig.Application.UseCases;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,6 +8,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<IdempotencyService>();
         services.AddScoped<CriarOrdemUseCase>();
         services.AddScoped<CriarOrdemAgendadaUseCase>();
         services.AddScoped<ConsultarOrdensUseCase>();
