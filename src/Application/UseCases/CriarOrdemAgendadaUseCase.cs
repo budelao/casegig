@@ -2,9 +2,9 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
+using CaseGig.Application.Operations;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
-using CaseGig.Domain.Services;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
@@ -19,7 +19,7 @@ public sealed class CriarOrdemAgendadaUseCase
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
     private readonly IdempotencyService _idempotencyService;
-    private readonly OrdemService _ordemService;
+    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public CriarOrdemAgendadaUseCase(
         ILogger<CriarOrdemAgendadaUseCase> logger,
@@ -29,7 +29,7 @@ public sealed class CriarOrdemAgendadaUseCase
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
         IdempotencyService idempotencyService,
-        OrdemService ordemService)
+        OrdemOperationHandlerFactory operationHandlerFactory)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -38,7 +38,7 @@ public sealed class CriarOrdemAgendadaUseCase
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
         _idempotencyService = idempotencyService;
-        _ordemService = ordemService;
+        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<CriarOrdemExecutionResult> ExecuteAsync(
@@ -94,12 +94,8 @@ public sealed class CriarOrdemAgendadaUseCase
 
                 var posicao = await _posicaoRepository.GetByIdAsync(request.IdCliente, request.IdFundo, ct);
 
-                var ordem = request.TipoOperacao switch
-                {
-                    TipoOperacao.APORTE => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, request.QuantidadeCotas, request.DataAgendamento, agora),
-                    TipoOperacao.RESGATE => _ordemService.CriarOrdemAgendadaResgate(cliente, fundo, posicao, request.QuantidadeCotas, request.DataAgendamento, agora),
-                    _ => throw new BusinessRuleException("Tipo de operação inválido.")
-                };
+                var handler = _operationHandlerFactory.Get(request.TipoOperacao);
+                var ordem = handler.CreateScheduled(cliente, fundo, posicao, request.QuantidadeCotas, request.DataAgendamento, agora);
 
                 if (normalizedKey is not null)
                 {
