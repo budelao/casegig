@@ -49,7 +49,7 @@ public sealed class CriarOrdemUseCase
         CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "API: Executando caso de uso: criar ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
+            "Executando caso de uso: criar ordem. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} QuantidadeCotas={QuantidadeCotas}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
@@ -147,7 +147,7 @@ public sealed class CriarOrdemUseCase
             throw;
         }
 
-        _logger.LogInformation("API: Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
+        _logger.LogInformation("Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
         return new CriarOrdemExecutionResult(result!, false);
     }
 

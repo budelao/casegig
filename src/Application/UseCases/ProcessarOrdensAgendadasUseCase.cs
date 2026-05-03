@@ -50,7 +50,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
             try
             {
                 _logger.LogInformation(
-                    "WORKER: Processando ordem agendada. Ordem={IdOrdem} Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao}",
+                    "Processando ordem agendada. Ordem={IdOrdem} Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao}",
                     ordem.IdOrdem,
                     ordem.IdCliente,
                     ordem.IdFundo,
@@ -94,7 +94,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
                         processadas++;
 
                         _logger.LogInformation(
-                            "WORKER: Ordem processada com sucesso. Ordem={IdOrdem} Status={Status}",
+                            "Ordem processada com sucesso. Ordem={IdOrdem} Status={Status}",
                             ordem.IdOrdem,
                             ordem.Status);
                     }
@@ -104,13 +104,13 @@ public sealed class ProcessarOrdensAgendadasUseCase
                         rejeitadas++;
 
                         _logger.LogWarning(
-                            "WORKER: Ordem rejeitada no processamento. Ordem={IdOrdem} Motivo={Motivo}",
+                            "Ordem rejeitada no processamento. Ordem={IdOrdem} Motivo={Motivo}",
                             ordem.IdOrdem,
                             ex.Message);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "WORKER: Erro inesperado durante o processamento da ordem. Ordem={IdOrdem}", ordem.IdOrdem);
+                        _logger.LogError(ex, "Erro inesperado durante o processamento da ordem. Ordem={IdOrdem}", ordem.IdOrdem);
                         throw;
                     }
                 }, cancellationToken);
@@ -118,12 +118,12 @@ public sealed class ProcessarOrdensAgendadasUseCase
             catch (ConcurrencyException)
             {
                 conflitosConcorrencia++;
-                _logger.LogWarning("WORKER: Conflito de concorrência ao processar ordem. Ordem={IdOrdem}", ordem.IdOrdem);
+                _logger.LogWarning("Conflito de concorrência ao processar ordem. Ordem={IdOrdem}", ordem.IdOrdem);
             }
             catch (Exception ex)
             {
                 erros++;
-                _logger.LogError(ex, "WORKER: Falha ao processar ordem agendada. Ordem={IdOrdem}", ordem.IdOrdem);
+                _logger.LogError(ex, "Falha ao processar ordem agendada. Ordem={IdOrdem}", ordem.IdOrdem);
             }
         }
 
