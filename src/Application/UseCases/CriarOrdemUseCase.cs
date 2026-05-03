@@ -2,9 +2,9 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
+using CaseGig.Application.Operations;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
-using CaseGig.Domain.Services;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
@@ -19,8 +19,7 @@ public sealed class CriarOrdemUseCase
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
     private readonly IdempotencyService _idempotencyService;
-    private readonly OrdemService _ordemService;
-    private readonly OrdemProcessamentoService _processamentoService;
+    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public CriarOrdemUseCase(
         ILogger<CriarOrdemUseCase> logger,
@@ -30,8 +29,7 @@ public sealed class CriarOrdemUseCase
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
         IdempotencyService idempotencyService,
-        OrdemService ordemService,
-        OrdemProcessamentoService processamentoService)
+        OrdemOperationHandlerFactory operationHandlerFactory)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -40,8 +38,7 @@ public sealed class CriarOrdemUseCase
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
         _idempotencyService = idempotencyService;
-        _ordemService = ordemService;
-        _processamentoService = processamentoService;
+        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<CriarOrdemExecutionResult> ExecuteAsync(
@@ -96,12 +93,8 @@ public sealed class CriarOrdemUseCase
 
                 var posicao = await _posicaoRepository.GetByIdAsync(request.IdCliente, request.IdFundo, ct);
 
-                var ordem = request.TipoOperacao switch
-                {
-                    TipoOperacao.APORTE => CriarOrdemAporte(cliente, fundo, request, agora),
-                    TipoOperacao.RESGATE => CriarOrdemResgate(cliente, fundo, posicao, request, agora),
-                    _ => throw new BusinessRuleException("Tipo de operação inválido.")
-                };
+                var handler = _operationHandlerFactory.Get(request.TipoOperacao);
+                var ordem = handler.CreateImmediate(cliente, fundo, posicao, request.QuantidadeCotas, agora);
 
                 if (normalizedKey is not null)
                 {
@@ -114,23 +107,12 @@ public sealed class CriarOrdemUseCase
 
                 if (ordem.Status == StatusOrdem.CRIADA)
                 {
-                    _processamentoService.PrepararParaProcessamento(ordem, agora);
-
-                    if (ordem.TipoOperacao == TipoOperacao.APORTE)
+                    if (ordem.TipoOperacao == TipoOperacao.RESGATE && posicao is null)
                     {
-                        _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao);
-                    }
-                    else
-                    {
-                        if (posicao is null)
-                        {
-                            throw new BusinessRuleException("Posição do cliente no fundo não encontrada.");
-                        }
-
-                        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
+                        throw new BusinessRuleException("Posição do cliente no fundo não encontrada.");
                     }
 
-                    _processamentoService.Concluir(ordem, agora);
+                    handler.Process(ordem, cliente, fundo, posicao, agora);
                 }
 
                 result = Map(ordem);
@@ -158,21 +140,6 @@ public sealed class CriarOrdemUseCase
 
         _logger.LogInformation("Ordem criada. Ordem={IdOrdem} Status={Status}", result!.IdOrdem, result!.Status);
         return new CriarOrdemExecutionResult(result!, false);
-    }
-
-    private Domain.Entities.Ordem CriarOrdemAporte(Domain.Entities.Cliente cliente, Domain.Entities.Fundo fundo, CriarOrdemRequestDto request, DateTime agora)
-    {
-        return _ordemService.CriarOrdemAportePorCotas(cliente, fundo, request.QuantidadeCotas, agora);
-    }
-
-    private Domain.Entities.Ordem CriarOrdemResgate(
-        Domain.Entities.Cliente cliente,
-        Domain.Entities.Fundo fundo,
-        Domain.Entities.Posicao? posicao,
-        CriarOrdemRequestDto request,
-        DateTime agora)
-    {
-        return _ordemService.CriarOrdemResgate(cliente, fundo, posicao, request.QuantidadeCotas, agora);
     }
 
     private static CriarOrdemResultDto Map(Domain.Entities.Ordem ordem)
