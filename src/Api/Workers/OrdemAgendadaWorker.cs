@@ -47,20 +47,20 @@ public sealed class OrdemAgendadaWorker : BackgroundService
 
         using var logScope = _logger.BeginScope(new Dictionary<string, object> { ["Source"] = "WORKER" });
         var agora = DateTime.Now;
-        _logger.LogInformation("WORKER: Worker ciclo iniciado. Agora={Agora} BatchSize={BatchSize}", agora, _batchSize);
+        _logger.LogInformation("Ciclo iniciado. Agora={Agora} BatchSize={BatchSize}", agora, _batchSize);
         var resumo = await useCase.ExecuteAsync(agora, _batchSize, stoppingToken);
         if (resumo.Encontradas == 0)
         {
-            _logger.LogInformation("WORKER: Worker não encontrou ordens elegíveis para processamento.");
+            _logger.LogInformation("Não encontrou ordens elegíveis para processamento.");
             return;
         }
 
-        _logger.LogInformation("WORKER: Worker encontrou ordens elegíveis. Encontradas={Encontradas}", resumo.Encontradas);
+        _logger.LogInformation("Encontrou ordens elegíveis. Encontradas={Encontradas}", resumo.Encontradas);
 
         if (resumo.Encontradas > 0 || resumo.ConflitosConcorrencia > 0 || resumo.Erros > 0)
         {
             _logger.LogInformation(
-                "WORKER: Worker processamento: Encontradas={Encontradas} Processadas={Processadas} Rejeitadas={Rejeitadas} ConflitosConcorrencia={ConflitosConcorrencia} Erros={Erros}",
+                "Processamento: Encontradas={Encontradas} Processadas={Processadas} Rejeitadas={Rejeitadas} ConflitosConcorrencia={ConflitosConcorrencia} Erros={Erros}",
                 resumo.Encontradas,
                 resumo.Processadas,
                 resumo.Rejeitadas,
