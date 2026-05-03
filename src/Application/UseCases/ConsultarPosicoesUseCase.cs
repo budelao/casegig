@@ -17,12 +17,12 @@ public sealed class ConsultarPosicoesUseCase
 
     public async Task<IReadOnlyList<PosicaoDto>> ExecuteAsync(Guid idCliente, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("API: Executando caso de uso: consultar posições. Cliente={IdCliente}", idCliente);
+        _logger.LogInformation("Executando caso de uso: consultar posições. Cliente={IdCliente}", idCliente);
         var posicoes = await _posicaoRepository.ListByClienteIdAsync(idCliente, cancellationToken);
         var result = posicoes
             .Select(p => new PosicaoDto(p.IdCliente, p.IdFundo, p.QuantidadeCotas))
             .ToList();
-        _logger.LogInformation("API: Consulta de posições concluída. Cliente={IdCliente} Quantidade={Quantidade}", idCliente, result.Count);
+        _logger.LogInformation("Consulta de posições concluída. Cliente={IdCliente} Quantidade={Quantidade}", idCliente, result.Count);
         return result;
     }
 }

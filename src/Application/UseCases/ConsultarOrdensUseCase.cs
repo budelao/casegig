@@ -17,7 +17,7 @@ public sealed class ConsultarOrdensUseCase
 
     public async Task<IReadOnlyList<OrdemDto>> ExecuteAsync(Guid idCliente, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("API: Executando caso de uso: consultar ordens. Cliente={IdCliente}", idCliente);
+        _logger.LogInformation("Executando caso de uso: consultar ordens. Cliente={IdCliente}", idCliente);
         var ordens = await _ordemRepository.ListByClienteIdAsync(idCliente, cancellationToken);
         var result = ordens
             .Select(o => new OrdemDto(
@@ -31,7 +31,7 @@ public sealed class ConsultarOrdensUseCase
                 o.DataAgendamento,
                 o.DataProcessamento))
             .ToList();
-        _logger.LogInformation("API: Consulta de ordens concluída. Cliente={IdCliente} Quantidade={Quantidade}", idCliente, result.Count);
+        _logger.LogInformation("Consulta de ordens concluída. Cliente={IdCliente} Quantidade={Quantidade}", idCliente, result.Count);
         return result;
     }
 }

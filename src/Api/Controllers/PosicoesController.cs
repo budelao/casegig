@@ -22,7 +22,7 @@ public sealed class PosicoesController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PosicaoDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<PosicaoDto>>>> ConsultarPosicoes(Guid idCliente, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("API: Consultando posições. Cliente={IdCliente}", idCliente);
+        _logger.LogInformation("Consultando posições. Cliente={IdCliente}", idCliente);
         var posicoes = await _consultarPosicoesUseCase.ExecuteAsync(idCliente, cancellationToken);
         return Ok(ApiResponse<IReadOnlyList<PosicaoDto>>.Ok(posicoes));
     }
