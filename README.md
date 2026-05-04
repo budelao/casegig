@@ -69,6 +69,12 @@ dotnet restore
 dotnet build
 ```
 
+Rodar os testes:
+
+```bash
+dotnet test
+```
+
 Rodar a API:
 
 ```bash
