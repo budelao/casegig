@@ -3,9 +3,14 @@ using CaseGig.Infrastructure;
 using CaseGig.Worker;
 using CaseGig.Worker.Logging;
 using Microsoft.Extensions.Logging.Console;
+using System.Globalization;
 using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
+
+var ptBr = new CultureInfo("pt-BR");
+CultureInfo.DefaultThreadCurrentCulture = ptBr;
+CultureInfo.DefaultThreadCurrentUICulture = ptBr;
 
 var builder = Host.CreateApplicationBuilder(args);
 

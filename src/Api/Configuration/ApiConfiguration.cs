@@ -2,7 +2,9 @@ using CaseGig.Api.Common.Json;
 using CaseGig.Api.Middlewares;
 using CaseGig.Api.Models.Responses;
 using CaseGig.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace CaseGig.Api.Configuration;
@@ -42,6 +44,14 @@ internal static class ApiConfiguration
 
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
+        var ptBr = new CultureInfo("pt-BR");
+        app.UseRequestLocalization(new RequestLocalizationOptions
+        {
+            DefaultRequestCulture = new RequestCulture(ptBr),
+            SupportedCultures = new List<CultureInfo> { ptBr },
+            SupportedUICultures = new List<CultureInfo> { ptBr }
+        });
+
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
