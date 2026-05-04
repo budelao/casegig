@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CaseGig.Api.Json;
+namespace CaseGig.Api.Common.Json;
 
 internal sealed class DateOnlyDdMmYyyyJsonConverter : JsonConverter<DateOnly>
 {
@@ -34,4 +34,3 @@ internal sealed class DateOnlyDdMmYyyyJsonConverter : JsonConverter<DateOnly>
         writer.WriteStringValue(value.ToString(Format, CultureInfo.InvariantCulture));
     }
 }
-

@@ -1,16 +1,17 @@
-using CaseGig.Api.Middleware;
-using CaseGig.Api.Observability;
-using CaseGig.Api.Resilience;
+using CaseGig.Api.BackgroundJobs;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.Extensions.Http;
+using System.Net;
 using System.Net.Http.Headers;
 
-namespace CaseGig.Api.Extensions;
+namespace CaseGig.Api.Configuration;
 
-internal static class HttpClientExtensions
+internal static class ResilienceConfiguration
 {
-    public static IServiceCollection AddObservabilityHttpClients(this IServiceCollection services)
+    public static WebApplicationBuilder AddResilienceConfiguration(this WebApplicationBuilder builder)
     {
-        services.AddHttpClient(ExportClients.Splunk, (sp, client) =>
+        builder.Services.AddHttpClient(ExportClients.Splunk, (sp, client) =>
         {
             var opt = sp.GetRequiredService<IOptionsMonitor<ObservabilityLoggingOptions>>().CurrentValue;
             client.Timeout = Timeout.InfiniteTimeSpan;
@@ -25,11 +26,11 @@ internal static class HttpClientExtensions
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", opt.Export.Splunk.Token);
             }
         })
-        .AddPolicyHandler(PollyPolicies.CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
-        .AddPolicyHandler(PollyPolicies.CreateRetryPolicy())
-        .AddPolicyHandler(PollyPolicies.CreateCircuitBreakerPolicy());
+        .AddPolicyHandler(CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
+        .AddPolicyHandler(CreateRetryPolicy())
+        .AddPolicyHandler(CreateCircuitBreakerPolicy());
 
-        services.AddHttpClient(ExportClients.Loki, (sp, client) =>
+        builder.Services.AddHttpClient(ExportClients.Loki, (sp, client) =>
         {
             var opt = sp.GetRequiredService<IOptionsMonitor<ObservabilityLoggingOptions>>().CurrentValue;
             client.Timeout = Timeout.InfiniteTimeSpan;
@@ -44,11 +45,11 @@ internal static class HttpClientExtensions
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", opt.Export.Grafana.Token);
             }
         })
-        .AddPolicyHandler(PollyPolicies.CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
-        .AddPolicyHandler(PollyPolicies.CreateRetryPolicy())
-        .AddPolicyHandler(PollyPolicies.CreateCircuitBreakerPolicy());
+        .AddPolicyHandler(CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
+        .AddPolicyHandler(CreateRetryPolicy())
+        .AddPolicyHandler(CreateCircuitBreakerPolicy());
 
-        services.AddHttpClient(ExportClients.Datadog, (sp, client) =>
+        builder.Services.AddHttpClient(ExportClients.Datadog, (sp, client) =>
         {
             var opt = sp.GetRequiredService<IOptionsMonitor<ObservabilityLoggingOptions>>().CurrentValue;
             var dd = opt.Export.Datadog;
@@ -63,11 +64,40 @@ internal static class HttpClientExtensions
                 client.DefaultRequestHeaders.Add("DD-API-KEY", dd.ApiKey);
             }
         })
-        .AddPolicyHandler(PollyPolicies.CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
-        .AddPolicyHandler(PollyPolicies.CreateRetryPolicy())
-        .AddPolicyHandler(PollyPolicies.CreateCircuitBreakerPolicy());
+        .AddPolicyHandler(CreateTimeoutPolicy(TimeSpan.FromSeconds(5)))
+        .AddPolicyHandler(CreateRetryPolicy())
+        .AddPolicyHandler(CreateCircuitBreakerPolicy());
 
-        return services;
+        return builder;
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> CreateRetryPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(r => r.StatusCode == (HttpStatusCode)429)
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt =>
+                {
+                    var baseDelayMs = 200 * Math.Pow(2, retryAttempt - 1);
+                    var jitterMs = Random.Shared.Next(0, 200);
+                    return TimeSpan.FromMilliseconds(baseDelayMs + jitterMs);
+                });
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> CreateCircuitBreakerPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(r => r.StatusCode == (HttpStatusCode)429)
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 5,
+                durationOfBreak: TimeSpan.FromSeconds(30));
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> CreateTimeoutPolicy(TimeSpan timeout)
+    {
+        return Policy.TimeoutAsync<HttpResponseMessage>(timeout);
     }
 }
-
