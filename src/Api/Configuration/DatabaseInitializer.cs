@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Data.Common;
 using System.Globalization;
 
-namespace CaseGig.Api.Startup;
+namespace CaseGig.Api.Configuration;
 
 internal static class DatabaseInitializer
 {
@@ -127,4 +127,3 @@ internal static class DatabaseInitializer
         command.Parameters.Add(parameter);
     }
 }
-

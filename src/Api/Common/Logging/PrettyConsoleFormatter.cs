@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 
-namespace CaseGig.Api.Logging;
+namespace CaseGig.Api.Common.Logging;
 
 internal sealed class PrettyConsoleFormatterOptions : ConsoleFormatterOptions
 {
@@ -173,7 +173,10 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
 
     private static string GetSourceFromCategory(string category)
     {
-        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+        if (category.Contains(".BackgroundJobs.", StringComparison.Ordinal)
+            || category.Contains(".BackgroundJobs", StringComparison.Ordinal)
+            || category.Contains(".Workers.", StringComparison.Ordinal)
+            || category.Contains(".Workers", StringComparison.Ordinal))
         {
             return "WORKER";
         }

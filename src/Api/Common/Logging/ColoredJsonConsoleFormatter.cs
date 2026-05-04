@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace CaseGig.Api.Logging;
+namespace CaseGig.Api.Common.Logging;
 
 internal sealed class ColoredJsonConsoleFormatterOptions : ConsoleFormatterOptions
 {
@@ -131,7 +131,10 @@ internal sealed class ColoredJsonConsoleFormatter : ConsoleFormatter
 
     private static string GetSourceFromCategory(string category)
     {
-        if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+        if (category.Contains(".BackgroundJobs.", StringComparison.Ordinal)
+            || category.Contains(".BackgroundJobs", StringComparison.Ordinal)
+            || category.Contains(".Workers.", StringComparison.Ordinal)
+            || category.Contains(".Workers", StringComparison.Ordinal))
         {
             return "WORKER";
         }

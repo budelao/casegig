@@ -1,4 +1,4 @@
-using CaseGig.Api.Contracts;
+using CaseGig.Api.Models.Responses;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.UseCases;
 using Microsoft.AspNetCore.Mvc;

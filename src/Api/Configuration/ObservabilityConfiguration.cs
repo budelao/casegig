@@ -1,12 +1,11 @@
-using CaseGig.Api.Middleware;
-using CaseGig.Api.Observability;
+using CaseGig.Api.BackgroundJobs;
 using Microsoft.Extensions.Logging;
 
-namespace CaseGig.Api.Extensions;
+namespace CaseGig.Api.Configuration;
 
-internal static class ObservabilityExtensions
+internal static class ObservabilityConfiguration
 {
-    public static WebApplicationBuilder AddObservability(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddObservabilityConfiguration(this WebApplicationBuilder builder)
     {
         builder.Services.Configure<ObservabilityLoggingOptions>(builder.Configuration.GetSection("Observability:Logging"));
 
@@ -14,9 +13,6 @@ internal static class ObservabilityExtensions
         builder.Logging.Services.AddSingleton<ILoggerProvider, ObservabilityExportLoggerProvider>();
         builder.Services.AddHostedService<ObservabilityExportWorker>();
 
-        builder.Services.AddObservabilityHttpClients();
-
         return builder;
     }
 }
-
