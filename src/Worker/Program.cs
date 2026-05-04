@@ -1,5 +1,4 @@
 using CaseGig.Application;
-using CaseGig.Domain.Services;
 using CaseGig.Infrastructure;
 using CaseGig.Worker;
 using CaseGig.Worker.Logging;
@@ -34,8 +33,6 @@ builder.Logging.AddConsoleFormatter<PrettyConsoleFormatter, PrettyConsoleFormatt
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddScoped<OrdemService>();
-builder.Services.AddScoped<OrdemProcessamentoService>();
 
 builder.Services.AddHostedService<OrdemAgendadaWorker>();
 

@@ -2,7 +2,6 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
-using CaseGig.Application.Operations;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -19,7 +18,6 @@ public sealed class CriarOrdemUseCase
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
     private readonly IdempotencyService _idempotencyService;
-    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public CriarOrdemUseCase(
         ILogger<CriarOrdemUseCase> logger,
@@ -28,8 +26,7 @@ public sealed class CriarOrdemUseCase
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
-        IdempotencyService idempotencyService,
-        OrdemOperationHandlerFactory operationHandlerFactory)
+        IdempotencyService idempotencyService)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -38,7 +35,6 @@ public sealed class CriarOrdemUseCase
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
         _idempotencyService = idempotencyService;
-        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<CriarOrdemExecutionResult> ExecuteAsync(
@@ -93,26 +89,17 @@ public sealed class CriarOrdemUseCase
 
                 var posicao = await _posicaoRepository.GetByIdAsync(request.IdCliente, request.IdFundo, ct);
 
-                var handler = _operationHandlerFactory.Get(request.TipoOperacao);
-                var ordem = handler.CreateImmediate(cliente, fundo, posicao, request.QuantidadeCotas, agora);
+                var ordem = cliente.CriarOrdemImediata(fundo, posicao, request.TipoOperacao, request.QuantidadeCotas, agora);
 
-                if (normalizedKey is not null)
-                {
-                    ordem.IdempotencyKey = normalizedKey;
-                    ordem.IdempotencyOperation = idempotencyOperation;
-                    ordem.IdempotencyRequestHash = idempotencyRequestHash;
-                }
+                var idempotency = normalizedKey is null
+                    ? null
+                    : new IdempotencyMetadata(idempotencyOperation, normalizedKey, idempotencyRequestHash!);
 
-                await _ordemRepository.AddAsync(ordem, ct);
+                await _ordemRepository.AddAsync(ordem, idempotency, ct);
 
                 if (ordem.Status == StatusOrdem.CRIADA)
                 {
-                    if (ordem.TipoOperacao == TipoOperacao.RESGATE && posicao is null)
-                    {
-                        throw new BusinessRuleException("Posição do cliente no fundo não encontrada.");
-                    }
-
-                    handler.Process(ordem, cliente, fundo, posicao, agora);
+                    ordem.Processar(cliente, fundo, posicao, agora);
                 }
 
                 result = Map(ordem);

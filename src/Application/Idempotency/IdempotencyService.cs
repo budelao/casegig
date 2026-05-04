@@ -32,12 +32,12 @@ public sealed class IdempotencyService
             return null;
         }
 
-        if (!string.Equals(existing.IdempotencyRequestHash, requestHash, StringComparison.Ordinal))
+        if (!string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal))
         {
             throw new ConcurrencyException("Idempotency-Key já utilizada com payload diferente.");
         }
 
-        return existing;
+        return existing.Ordem;
     }
 
     public async Task<Ordem?> TryGetReplayAfterFailureAsync(
@@ -53,9 +53,8 @@ public sealed class IdempotencyService
             return null;
         }
 
-        return string.Equals(existing.IdempotencyRequestHash, requestHash, StringComparison.Ordinal)
-            ? existing
+        return string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal)
+            ? existing.Ordem
             : null;
     }
 }
-
