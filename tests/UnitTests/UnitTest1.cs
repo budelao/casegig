@@ -2,28 +2,23 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
-using CaseGig.Application.Operations;
 using CaseGig.Application.UseCases;
 using Microsoft.Extensions.Logging.Abstractions;
 using CaseGig.Domain.Entities;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
-using CaseGig.Domain.Services;
 
 namespace CaseGig.UnitTests;
 
 public sealed class OrdemRulesTests
 {
-    private readonly OrdemService _ordemService = new();
-    private readonly OrdemProcessamentoService _processamentoService = new();
-
     [Fact]
     public void CriarOrdemAporte_DeveRejeitar_QuandoSaldoInsuficiente()
     {
         var cliente = NovoCliente(100m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 1m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 20m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 20m, HojeAs(10, 0)));
         Assert.Contains("Saldo insuficiente", ex.Message);
     }
 
@@ -34,7 +29,7 @@ public sealed class OrdemRulesTests
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 0m);
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 5m };
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 10m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 10m, HojeAs(10, 0)));
         Assert.Contains("Cotas insuficientes", ex.Message);
     }
 
@@ -44,11 +39,11 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0), valorCota: 10m, valorMinimoAporte: 1m);
 
-        var dentro = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(13, 0));
+        var dentro = cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, HojeAs(13, 0));
         Assert.Equal(StatusOrdem.CRIADA, dentro.Status);
         Assert.Null(dentro.DataAgendamento);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(15, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, HojeAs(15, 0)));
     }
 
     [Fact]
@@ -57,8 +52,8 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(0m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, DateOnly.FromDateTime(HojeAs(0, 0)), HojeAs(10, 0)));
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, new DateOnly(2026, 5, 2), HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, DateOnly.FromDateTime(HojeAs(0, 0)), HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, new DateOnly(2026, 5, 2), HojeAs(10, 0)));
     }
 
     [Fact]
@@ -67,7 +62,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(0m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ordem = _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 100m, new DateOnly(2026, 5, 4), HojeAs(10, 0));
+        var ordem = cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 100m, new DateOnly(2026, 5, 4), HojeAs(10, 0));
         Assert.Equal(StatusOrdem.AGENDADA, ordem.Status);
         Assert.Equal(new DateTime(2026, 5, 4, 14, 0, 0), ordem.DataAgendamento);
         Assert.Equal(100m, ordem.QuantidadeCotas);
@@ -79,7 +74,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 5m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 5m, HojeAs(10, 0)));
         Assert.Contains("abaixo do mínimo", ex.Message);
     }
 
@@ -89,7 +84,7 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 100m);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 50m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 50m, HojeAs(10, 0)));
     }
 
     [Fact]
@@ -99,7 +94,7 @@ public sealed class OrdemRulesTests
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 50m);
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 6m, HojeAs(10, 0)));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 6m, HojeAs(10, 0)));
         Assert.Contains("permanência", ex.Message);
     }
 
@@ -110,7 +105,7 @@ public sealed class OrdemRulesTests
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 50m);
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 200m };
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 170m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 170m, HojeAs(10, 0)));
     }
 
     [Fact]
@@ -119,10 +114,10 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(10000m);
         var fundo = NovoFundoFechado(valorCota: 10m, valorMinimoAporte: 100m);
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, HojeAs(10, 0)));
 
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 1m, HojeAs(10, 0)));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 1m, HojeAs(10, 0)));
     }
 
     [Fact]
@@ -131,10 +126,8 @@ public sealed class OrdemRulesTests
         var cliente = NovoCliente(1000m);
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoAporte: 1m);
 
-        var ordem = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, HojeAs(10, 0));
-        _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
-        _processamentoService.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null);
-        _processamentoService.Concluir(ordem, HojeAs(10, 0));
+        var ordem = cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, HojeAs(10, 0));
+        ordem.Processar(cliente, fundo, posicao: null, HojeAs(10, 0));
 
         Assert.Equal(StatusOrdem.CONCLUIDA, ordem.Status);
         Assert.Equal(900m, cliente.SaldoDisponivel);
@@ -149,10 +142,8 @@ public sealed class OrdemRulesTests
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 0m);
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 20m };
 
-        var ordem = _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 5m, HojeAs(10, 0));
-        _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
-        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
-        _processamentoService.Concluir(ordem, HojeAs(10, 0));
+        var ordem = cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 5m, HojeAs(10, 0));
+        ordem.Processar(cliente, fundo, posicao, HojeAs(10, 0));
 
         Assert.Equal(StatusOrdem.CONCLUIDA, ordem.Status);
         Assert.Equal(50m, cliente.SaldoDisponivel);
@@ -166,10 +157,8 @@ public sealed class OrdemRulesTests
         var fundo = NovoFundoAberto(valorCota: 10m, valorMinimoPermanencia: 0m);
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 600m };
 
-        var ordem = _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 500m, HojeAs(10, 0));
-        _processamentoService.PrepararParaProcessamento(ordem, HojeAs(10, 0));
-        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
-        _processamentoService.Concluir(ordem, HojeAs(10, 0));
+        var ordem = cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 500m, HojeAs(10, 0));
+        ordem.Processar(cliente, fundo, posicao, HojeAs(10, 0));
 
         Assert.Equal(100m, posicao.QuantidadeCotas);
         Assert.Equal(5000m, cliente.SaldoDisponivel);
@@ -245,13 +234,6 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -259,8 +241,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
 
@@ -271,9 +252,11 @@ public sealed class IdempotencyUseCaseTests
         Assert.True(second.IsReplay);
         Assert.Equal(first.Result.IdOrdem, second.Result.IdOrdem);
         Assert.Single(ordens.Items);
-        Assert.Equal("key-1", ordens.Items[0].IdempotencyKey);
-        Assert.Equal("POST /ordens", ordens.Items[0].IdempotencyOperation);
-        Assert.False(string.IsNullOrWhiteSpace(ordens.Items[0].IdempotencyRequestHash));
+        var idempotency = ordens.GetIdempotency(ordens.Items[0].IdOrdem);
+        Assert.NotNull(idempotency);
+        Assert.Equal("key-1", idempotency!.Key);
+        Assert.Equal("POST /ordens", idempotency.Operation);
+        Assert.False(string.IsNullOrWhiteSpace(idempotency.RequestHash));
     }
 
     [Fact]
@@ -294,13 +277,6 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -308,8 +284,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request1 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         var request2 = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 11m);
@@ -338,13 +313,6 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -352,8 +320,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
 
@@ -384,13 +351,6 @@ public sealed class IdempotencyUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemAgendadaUseCase(
             NullLogger<CriarOrdemAgendadaUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -398,8 +358,7 @@ public sealed class IdempotencyUseCaseTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemAgendamentoRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m, new DateOnly(2026, 5, 5));
 
@@ -410,7 +369,9 @@ public sealed class IdempotencyUseCaseTests
         Assert.True(second.IsReplay);
         Assert.Equal(first.Result.IdOrdem, second.Result.IdOrdem);
         Assert.Single(ordens.Items);
-        Assert.Equal("POST /ordens/agendamento", ordens.Items[0].IdempotencyOperation);
+        var idempotency = ordens.GetIdempotency(ordens.Items[0].IdOrdem);
+        Assert.NotNull(idempotency);
+        Assert.Equal("POST /ordens/agendamento", idempotency!.Operation);
     }
 }
 
@@ -435,13 +396,6 @@ public sealed class CriarOrdemUseCaseFlowTests
 
         var posicoes = new InMemoryPosicaoRepository();
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -449,8 +403,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             posicoes,
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         var result = await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
@@ -485,13 +438,6 @@ public sealed class CriarOrdemUseCaseFlowTests
         var posicoes = new InMemoryPosicaoRepository(posicao);
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -499,8 +445,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             posicoes,
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.RESGATE, 5m);
         await useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None);
@@ -529,13 +474,6 @@ public sealed class CriarOrdemUseCaseFlowTests
         };
 
         var ordens = new InMemoryOrdemRepository();
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new CriarOrdemUseCase(
             NullLogger<CriarOrdemUseCase>.Instance,
             new InMemoryTransactionManager(),
@@ -543,8 +481,7 @@ public sealed class CriarOrdemUseCaseFlowTests
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
             ordens,
-            new IdempotencyService(ordens),
-            handlerFactory);
+            new IdempotencyService(ordens));
 
         var request = new CriarOrdemRequestDto(cliente.IdCliente, fundo.IdFundo, TipoOperacao.APORTE, 10m);
         await Assert.ThrowsAsync<BusinessRuleException>(() => useCase.ExecuteAsync(request, agora, idempotencyKey: null, CancellationToken.None));
@@ -585,21 +522,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
             new InMemoryClienteRepository(cliente),
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
-            ordens,
-            handlerFactory);
+            ordens);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
@@ -642,21 +571,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
             new InMemoryClienteRepository(cliente),
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
-            ordens,
-            handlerFactory);
+            ordens);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
@@ -698,21 +619,13 @@ public sealed class ProcessarOrdensAgendadasUseCaseTests
         };
 
         var ordens = new InMemoryOrdemRepository(ordem);
-        var ordemService = new OrdemService();
-        var processamentoService = new OrdemProcessamentoService();
-        var handlerFactory = new OrdemOperationHandlerFactory(new IOrdemOperationHandler[]
-        {
-            new AporteOrdemOperationHandler(ordemService, processamentoService),
-            new ResgateOrdemOperationHandler(ordemService, processamentoService)
-        });
         var useCase = new ProcessarOrdensAgendadasUseCase(
             NullLogger<ProcessarOrdensAgendadasUseCase>.Instance,
             new InMemoryTransactionManager(),
             new InMemoryClienteRepository(cliente),
             new InMemoryFundoRepository(fundo),
             new InMemoryPosicaoRepository(),
-            ordens,
-            handlerFactory);
+            ordens);
 
         var resumo = await useCase.ExecuteAsync(agora, maximo: 10, CancellationToken.None);
 
@@ -813,22 +726,19 @@ public sealed class DomainEdgeCaseTests
     [Fact]
     public void OrdemProcessamento_Preparar_DeveFalhar_QuandoStatusFinal()
     {
-        var svc = new OrdemProcessamentoService();
-
         var concluida = new Ordem { Status = StatusOrdem.CONCLUIDA };
-        Assert.Throws<BusinessRuleException>(() => svc.PrepararParaProcessamento(concluida, new DateTime(2026, 5, 1, 10, 0, 0)));
+        Assert.Throws<BusinessRuleException>(() => concluida.PrepararParaProcessamento(new DateTime(2026, 5, 1, 10, 0, 0)));
 
         var rejeitada = new Ordem { Status = StatusOrdem.REJEITADA };
-        Assert.Throws<BusinessRuleException>(() => svc.PrepararParaProcessamento(rejeitada, new DateTime(2026, 5, 1, 10, 0, 0)));
+        Assert.Throws<BusinessRuleException>(() => rejeitada.PrepararParaProcessamento(new DateTime(2026, 5, 1, 10, 0, 0)));
 
         var cancelada = new Ordem { Status = StatusOrdem.CANCELADA };
-        Assert.Throws<BusinessRuleException>(() => svc.PrepararParaProcessamento(cancelada, new DateTime(2026, 5, 1, 10, 0, 0)));
+        Assert.Throws<BusinessRuleException>(() => cancelada.PrepararParaProcessamento(new DateTime(2026, 5, 1, 10, 0, 0)));
     }
 
     [Fact]
     public void OrdemProcessamento_Preparar_DeveFalhar_QuandoAgendadaAindaNaoElegivel()
     {
-        var svc = new OrdemProcessamentoService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var ordem = new Ordem
@@ -837,14 +747,13 @@ public sealed class DomainEdgeCaseTests
             DataAgendamento = agora.AddDays(1)
         };
 
-        var ex = Assert.Throws<BusinessRuleException>(() => svc.PrepararParaProcessamento(ordem, agora));
+        var ex = Assert.Throws<BusinessRuleException>(() => ordem.PrepararParaProcessamento(agora));
         Assert.Contains("não está elegível", ex.Message);
     }
 
     [Fact]
     public void OrdemProcessamento_Concluir_DeveZerarAgendamentoESetarDataProcessamento()
     {
-        var svc = new OrdemProcessamentoService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var ordem = new Ordem
@@ -853,7 +762,7 @@ public sealed class DomainEdgeCaseTests
             DataAgendamento = agora.AddMinutes(-1)
         };
 
-        svc.Concluir(ordem, agora);
+        ordem.Concluir(agora);
 
         Assert.Equal(StatusOrdem.CONCLUIDA, ordem.Status);
         Assert.Equal(agora, ordem.DataProcessamento);
@@ -863,11 +772,10 @@ public sealed class DomainEdgeCaseTests
     [Fact]
     public void OrdemProcessamento_Rejeitar_DeveSetarStatusEDataProcessamento()
     {
-        var svc = new OrdemProcessamentoService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var ordem = new Ordem { Status = StatusOrdem.EM_PROCESSAMENTO };
-        svc.Rejeitar(ordem, agora);
+        ordem.Rejeitar(agora);
 
         Assert.Equal(StatusOrdem.REJEITADA, ordem.Status);
         Assert.Equal(agora, ordem.DataProcessamento);
@@ -876,7 +784,6 @@ public sealed class DomainEdgeCaseTests
     [Fact]
     public void OrdemService_Agendamento_DeveRejeitar_QuandoFimDeSemana()
     {
-        var svc = new OrdemService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
@@ -892,14 +799,13 @@ public sealed class DomainEdgeCaseTests
         };
 
         var sabado = new DateOnly(2026, 5, 2);
-        var ex = Assert.Throws<BusinessRuleException>(() => svc.CriarOrdemAgendadaAporte(cliente, fundo, 10m, sabado, agora));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, sabado, agora));
         Assert.Contains("dia útil", ex.Message);
     }
 
     [Fact]
     public void OrdemService_CriarOrdemAgendadaResgate_DeveRejeitar_QuandoCotasInsuficientes()
     {
-        var svc = new OrdemService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
@@ -916,14 +822,12 @@ public sealed class DomainEdgeCaseTests
 
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 1m };
         var data = new DateOnly(2026, 5, 4);
-        Assert.Throws<BusinessRuleException>(() => svc.CriarOrdemAgendadaResgate(cliente, fundo, posicao, 2m, data, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao, TipoOperacao.RESGATE, 2m, data, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarAporte_DeveRejeitar_QuandoFundoFechado()
     {
-        var processamento = new OrdemProcessamentoService();
-
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 1000m };
         var fundo = new Fundo
         {
@@ -936,18 +840,17 @@ public sealed class DomainEdgeCaseTests
             StatusCaptacao = StatusCaptacao.FECHADO
         };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.CRIADA, DataCriacao = new DateTime(2026, 5, 1, 10, 0, 0) };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao: null, new DateTime(2026, 5, 1, 10, 0, 0)));
     }
 }
 
 public sealed class DomainMoreCoverageTests
 {
     [Fact]
-    public void OrdemProcessamentoService_ProcessarAporte_DeveRejeitar_QuandoTipoInvalido()
+    public void Ordem_Processar_DeveRejeitar_QuandoTipoInvalido()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 1000m };
         var fundo = new Fundo
         {
@@ -960,15 +863,14 @@ public sealed class DomainMoreCoverageTests
             StatusCaptacao = StatusCaptacao.ABERTO
         };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.RESGATE, QuantidadeCotas = 10m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = (TipoOperacao)999, QuantidadeCotas = 10m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao: null, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarAporte_DeveRejeitar_QuandoQuantidadeAbaixoDoMinimo()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 1000m };
         var fundo = new Fundo
         {
@@ -981,15 +883,14 @@ public sealed class DomainMoreCoverageTests
             StatusCaptacao = StatusCaptacao.ABERTO
         };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao: null, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarAporte_DeveRejeitar_QuandoSaldoInsuficiente()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 50m };
         var fundo = new Fundo
         {
@@ -1002,15 +903,14 @@ public sealed class DomainMoreCoverageTests
             StatusCaptacao = StatusCaptacao.ABERTO
         };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao: null, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarAporte_DeveCriarPosicao_QuandoNaoExiste()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 1000m };
         var fundo = new Fundo
         {
@@ -1023,8 +923,8 @@ public sealed class DomainMoreCoverageTests
             StatusCaptacao = StatusCaptacao.ABERTO
         };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        processamento.ProcessarOrdemAporte(ordem, cliente, fundo, posicao: null);
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 10m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        ordem.Processar(cliente, fundo, posicao: null, agora);
 
         Assert.Single(cliente.Posicoes);
         Assert.Single(fundo.Posicoes);
@@ -1036,8 +936,7 @@ public sealed class DomainMoreCoverageTests
     [Fact]
     public void OrdemProcessamentoService_ProcessarResgate_DeveRejeitar_QuandoTipoInvalido()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
         var fundo = new Fundo
         {
@@ -1051,15 +950,14 @@ public sealed class DomainMoreCoverageTests
         };
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.APORTE, QuantidadeCotas = 1m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemResgate(ordem, cliente, fundo, posicao));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = (TipoOperacao)999, QuantidadeCotas = 1m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarResgate_DeveRejeitar_QuandoFundoFechado()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
         var fundo = new Fundo
         {
@@ -1073,15 +971,14 @@ public sealed class DomainMoreCoverageTests
         };
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.RESGATE, QuantidadeCotas = 1m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemResgate(ordem, cliente, fundo, posicao));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.RESGATE, QuantidadeCotas = 1m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao, agora));
     }
 
     [Fact]
     public void OrdemProcessamentoService_ProcessarResgate_DeveRejeitar_QuandoViolaPermanenciaMinima()
     {
-        var processamento = new OrdemProcessamentoService();
-
+        var agora = new DateTime(2026, 5, 1, 10, 0, 0);
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 0m };
         var fundo = new Fundo
         {
@@ -1095,14 +992,13 @@ public sealed class DomainMoreCoverageTests
         };
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 60m };
 
-        var ordem = new Ordem { TipoOperacao = TipoOperacao.RESGATE, QuantidadeCotas = 20m, Status = StatusOrdem.EM_PROCESSAMENTO };
-        Assert.Throws<BusinessRuleException>(() => processamento.ProcessarOrdemResgate(ordem, cliente, fundo, posicao));
+        var ordem = new Ordem { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, TipoOperacao = TipoOperacao.RESGATE, QuantidadeCotas = 20m, Status = StatusOrdem.CRIADA, DataCriacao = agora };
+        Assert.Throws<BusinessRuleException>(() => ordem.Processar(cliente, fundo, posicao, agora));
     }
 
     [Fact]
     public void OrdemService_CriarOrdemAportePorCotas_DevePreencherCamposBasicos()
     {
-        var svc = new OrdemService();
         var agora = new DateTime(2026, 5, 1, 10, 0, 0);
 
         var cliente = new Cliente { IdCliente = Guid.NewGuid(), Nome = "Cliente", Cpf = "00000000000", SaldoDisponivel = 1000m };
@@ -1117,7 +1013,7 @@ public sealed class DomainMoreCoverageTests
             StatusCaptacao = StatusCaptacao.ABERTO
         };
 
-        var ordem = svc.CriarOrdemAportePorCotas(cliente, fundo, 10m, agora);
+        var ordem = cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, agora);
         Assert.Equal(cliente.IdCliente, ordem.IdCliente);
         Assert.Equal(fundo.IdFundo, ordem.IdFundo);
         Assert.Equal(TipoOperacao.APORTE, ordem.TipoOperacao);
@@ -1191,6 +1087,8 @@ internal sealed class InMemoryPosicaoRepository : IPosicaoRepository
 
 internal sealed class InMemoryOrdemRepository : IOrdemRepository
 {
+    private readonly Dictionary<Guid, IdempotencyMetadata> _idempotency = new();
+
     public List<Ordem> Items { get; }
 
     public InMemoryOrdemRepository(params Ordem[] ordens)
@@ -1198,19 +1096,30 @@ internal sealed class InMemoryOrdemRepository : IOrdemRepository
         Items = ordens.ToList();
     }
 
-    public Task AddAsync(Ordem ordem, CancellationToken cancellationToken)
+    public Task AddAsync(Ordem ordem, IdempotencyMetadata? idempotency, CancellationToken cancellationToken)
     {
         Items.Add(ordem);
+        if (idempotency is not null)
+        {
+            _idempotency[ordem.IdOrdem] = idempotency;
+        }
         return Task.CompletedTask;
     }
 
-    public Task<Ordem?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
+    public Task<OrdemIdempotencyMatch?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
     {
         var found = Items
-            .Where(x => x.IdCliente == idCliente && x.IdempotencyOperation == operation && x.IdempotencyKey == key)
+            .Where(x => x.IdCliente == idCliente && _idempotency.TryGetValue(x.IdOrdem, out var meta) && meta.Operation == operation && meta.Key == key)
             .OrderByDescending(x => x.DataCriacao)
             .FirstOrDefault();
-        return Task.FromResult(found);
+
+        if (found is null)
+        {
+            return Task.FromResult<OrdemIdempotencyMatch?>(null);
+        }
+
+        _idempotency.TryGetValue(found.IdOrdem, out var idempotency);
+        return Task.FromResult<OrdemIdempotencyMatch?>(new OrdemIdempotencyMatch(found, idempotency?.RequestHash));
     }
 
     public Task<IReadOnlyList<Ordem>> ListByClienteIdAsync(Guid idCliente, CancellationToken cancellationToken)
@@ -1228,13 +1137,15 @@ internal sealed class InMemoryOrdemRepository : IOrdemRepository
             .ToList();
         return Task.FromResult(result);
     }
+
+    public IdempotencyMetadata? GetIdempotency(Guid idOrdem)
+    {
+        return _idempotency.TryGetValue(idOrdem, out var value) ? value : null;
+    }
 }
 
 public sealed class DomainCriticalRulesTests
 {
-    private readonly OrdemService _ordemService = new();
-    private readonly OrdemProcessamentoService _processamentoService = new();
-
     [Fact]
     public void OrdemService_CriarOrdemAportePorCotas_DeveRejeitar_QuandoQuantidadeInvalida()
     {
@@ -1242,8 +1153,8 @@ public sealed class DomainCriticalRulesTests
         var cliente = NovoCliente(1000m);
         var fundo = NovoFundoAberto();
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 0m, agora));
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, -1m, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 0m, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, -1m, agora));
     }
 
     [Fact]
@@ -1254,8 +1165,8 @@ public sealed class DomainCriticalRulesTests
         var fundo = NovoFundoAberto();
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
 
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 0m, agora));
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, -1m, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 0m, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, -1m, agora));
     }
 
     [Fact]
@@ -1265,7 +1176,7 @@ public sealed class DomainCriticalRulesTests
         var cliente = NovoCliente(0m);
         var fundo = NovoFundoAberto();
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao: null, quantidadeCotas: 1m, agora));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.RESGATE, 1m, agora));
         Assert.Contains("Cotas insuficientes", ex.Message);
     }
 
@@ -1276,7 +1187,7 @@ public sealed class DomainCriticalRulesTests
         var cliente = NovoCliente(1000m);
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0));
 
-        var ordem = _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, agora);
+        var ordem = cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, agora);
         Assert.Equal(StatusOrdem.CRIADA, ordem.Status);
     }
 
@@ -1287,7 +1198,7 @@ public sealed class DomainCriticalRulesTests
         var cliente = NovoCliente(1000m);
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0));
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAportePorCotas(cliente, fundo, 10m, agora));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao: null, TipoOperacao.APORTE, 10m, agora));
         Assert.Contains("cut-off", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1299,7 +1210,7 @@ public sealed class DomainCriticalRulesTests
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0));
         var posicao = new Posicao { IdCliente = cliente.IdCliente, IdFundo = fundo.IdFundo, QuantidadeCotas = 10m };
 
-        var ex = Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemResgate(cliente, fundo, posicao, 1m, agora));
+        var ex = Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemImediata(fundo, posicao, TipoOperacao.RESGATE, 1m, agora));
         Assert.Contains("cut-off", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1311,7 +1222,7 @@ public sealed class DomainCriticalRulesTests
         var fundo = NovoFundoAberto(cutoff: new TimeSpan(14, 0, 0));
 
         var dataAgendamento = new DateOnly(2026, 5, 4);
-        var ordem = _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, dataAgendamento, agora);
+        var ordem = cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, dataAgendamento, agora);
 
         Assert.Equal(StatusOrdem.AGENDADA, ordem.Status);
         Assert.Equal(new DateTime(2026, 5, 4, 14, 0, 0), ordem.DataAgendamento);
@@ -1326,7 +1237,7 @@ public sealed class DomainCriticalRulesTests
         var fundo = NovoFundoAberto();
 
         var hoje = DateOnly.FromDateTime(agora.Date);
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, hoje, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, hoje, agora));
     }
 
     [Fact]
@@ -1337,7 +1248,7 @@ public sealed class DomainCriticalRulesTests
         var fundo = NovoFundoAberto(valorMinimoAporte: 100m);
 
         var dataAgendamento = new DateOnly(2026, 5, 4);
-        Assert.Throws<BusinessRuleException>(() => _ordemService.CriarOrdemAgendadaAporte(cliente, fundo, 10m, dataAgendamento, agora));
+        Assert.Throws<BusinessRuleException>(() => cliente.CriarOrdemAgendada(fundo, posicao: null, TipoOperacao.APORTE, 10m, dataAgendamento, agora));
     }
 
     [Fact]
@@ -1357,10 +1268,10 @@ public sealed class DomainCriticalRulesTests
             TipoOperacao = TipoOperacao.RESGATE,
             QuantidadeCotas = 2m,
             DataCriacao = agora,
-            Status = StatusOrdem.EM_PROCESSAMENTO
+            Status = StatusOrdem.CRIADA
         };
 
-        _processamentoService.ProcessarOrdemResgate(ordem, cliente, fundo, posicao);
+        ordem.Processar(cliente, fundo, posicao, agora);
 
         Assert.Equal(8m, posicao.QuantidadeCotas);
         Assert.Equal(20m, cliente.SaldoDisponivel);

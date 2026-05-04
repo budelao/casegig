@@ -2,8 +2,6 @@ using CaseGig.Application.Abstractions;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.Exceptions;
 using CaseGig.Application.Idempotency;
-using CaseGig.Application.Operations;
-using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -19,7 +17,6 @@ public sealed class CriarOrdemAgendadaUseCase
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
     private readonly IdempotencyService _idempotencyService;
-    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public CriarOrdemAgendadaUseCase(
         ILogger<CriarOrdemAgendadaUseCase> logger,
@@ -28,8 +25,7 @@ public sealed class CriarOrdemAgendadaUseCase
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
         IOrdemRepository ordemRepository,
-        IdempotencyService idempotencyService,
-        OrdemOperationHandlerFactory operationHandlerFactory)
+        IdempotencyService idempotencyService)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -38,7 +34,6 @@ public sealed class CriarOrdemAgendadaUseCase
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
         _idempotencyService = idempotencyService;
-        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<CriarOrdemExecutionResult> ExecuteAsync(
@@ -94,17 +89,13 @@ public sealed class CriarOrdemAgendadaUseCase
 
                 var posicao = await _posicaoRepository.GetByIdAsync(request.IdCliente, request.IdFundo, ct);
 
-                var handler = _operationHandlerFactory.Get(request.TipoOperacao);
-                var ordem = handler.CreateScheduled(cliente, fundo, posicao, request.QuantidadeCotas, request.DataAgendamento, agora);
+                var ordem = cliente.CriarOrdemAgendada(fundo, posicao, request.TipoOperacao, request.QuantidadeCotas, request.DataAgendamento, agora);
 
-                if (normalizedKey is not null)
-                {
-                    ordem.IdempotencyKey = normalizedKey;
-                    ordem.IdempotencyOperation = idempotencyOperation;
-                    ordem.IdempotencyRequestHash = idempotencyRequestHash;
-                }
+                var idempotency = normalizedKey is null
+                    ? null
+                    : new IdempotencyMetadata(idempotencyOperation, normalizedKey, idempotencyRequestHash!);
 
-                await _ordemRepository.AddAsync(ordem, ct);
+                await _ordemRepository.AddAsync(ordem, idempotency, ct);
 
                 result = Map(ordem);
             }, cancellationToken);

@@ -1,6 +1,7 @@
 using CaseGig.Api.Common.Json;
 using CaseGig.Api.Middlewares;
 using CaseGig.Api.Models.Responses;
+using CaseGig.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 
@@ -35,7 +36,7 @@ internal static class ApiConfiguration
 
     public static WebApplication InitializeDatabase(this WebApplication app, bool recreateDb)
     {
-        DatabaseInitializer.Initialize(app, recreateDb);
+        DatabaseInitializer.Initialize(app.Services, recreateDb, app.Environment.IsDevelopment());
         return app;
     }
 
