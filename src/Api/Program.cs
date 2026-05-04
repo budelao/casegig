@@ -1,6 +1,5 @@
 using CaseGig.Api.Configuration;
 using CaseGig.Application;
-using CaseGig.Domain.Services;
 using CaseGig.Infrastructure;
 using System.Text;
 
@@ -16,8 +15,6 @@ builder.AddSwaggerConfiguration();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddScoped<OrdemService>();
-builder.Services.AddScoped<OrdemProcessamentoService>();
 
 var app = builder.Build();
 

@@ -1,26 +1,26 @@
-using CaseGig.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Data.Common;
 using System.Globalization;
 
-namespace CaseGig.Api.Configuration;
+namespace CaseGig.Infrastructure.Persistence;
 
-internal static class DatabaseInitializer
+public static class DatabaseInitializer
 {
-    public static void Initialize(WebApplication app, bool recreateDb)
+    public static void Initialize(IServiceProvider serviceProvider, bool recreateDb, bool isDevelopment)
     {
-        using var scope = app.Services.CreateScope();
+        using var scope = serviceProvider.CreateScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
         var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentDbContext>();
 
-        if (recreateDb && app.Environment.IsDevelopment())
+        if (recreateDb && isDevelopment)
         {
             logger.LogWarning("Recriando banco de dados por solicitação (--recreate-db)");
             dbContext.Database.EnsureDeleted();
             dbContext.Database.Migrate();
         }
-        else if (app.Environment.IsDevelopment() && HasMigrationsHistoryTable(dbContext))
+        else if (isDevelopment && HasMigrationsHistoryTable(dbContext))
         {
             try
             {

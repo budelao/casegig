@@ -15,18 +15,29 @@ public sealed class OrdemRepository : IOrdemRepository
         _dbContext = dbContext;
     }
 
-    public Task AddAsync(Ordem ordem, CancellationToken cancellationToken)
+    public Task AddAsync(Ordem ordem, IdempotencyMetadata? idempotency, CancellationToken cancellationToken)
     {
         _dbContext.Ordens.Add(ordem);
+        if (idempotency is not null)
+        {
+            var entry = _dbContext.Entry(ordem);
+            entry.Property("IdempotencyKey").CurrentValue = idempotency.Key;
+            entry.Property("IdempotencyOperation").CurrentValue = idempotency.Operation;
+            entry.Property("IdempotencyRequestHash").CurrentValue = idempotency.RequestHash;
+        }
         return Task.CompletedTask;
     }
 
-    public async Task<Ordem?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
+    public async Task<OrdemIdempotencyMatch?> GetByIdempotencyAsync(Guid idCliente, string operation, string key, CancellationToken cancellationToken)
     {
         return await _dbContext.Ordens
             .AsNoTracking()
-            .Where(x => x.IdCliente == idCliente && x.IdempotencyOperation == operation && x.IdempotencyKey == key)
+            .Where(x =>
+                x.IdCliente == idCliente
+                && EF.Property<string?>(x, "IdempotencyOperation") == operation
+                && EF.Property<string?>(x, "IdempotencyKey") == key)
             .OrderByDescending(x => x.DataCriacao)
+            .Select(x => new OrdemIdempotencyMatch(x, EF.Property<string?>(x, "IdempotencyRequestHash")))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

@@ -1,6 +1,5 @@
 using CaseGig.Application.Abstractions;
 using CaseGig.Application.Exceptions;
-using CaseGig.Application.Operations;
 using CaseGig.Domain.Enums;
 using CaseGig.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -15,7 +14,6 @@ public sealed class ProcessarOrdensAgendadasUseCase
     private readonly IFundoRepository _fundoRepository;
     private readonly IPosicaoRepository _posicaoRepository;
     private readonly IOrdemRepository _ordemRepository;
-    private readonly OrdemOperationHandlerFactory _operationHandlerFactory;
 
     public ProcessarOrdensAgendadasUseCase(
         ILogger<ProcessarOrdensAgendadasUseCase> logger,
@@ -23,8 +21,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
         IClienteRepository clienteRepository,
         IFundoRepository fundoRepository,
         IPosicaoRepository posicaoRepository,
-        IOrdemRepository ordemRepository,
-        OrdemOperationHandlerFactory operationHandlerFactory)
+        IOrdemRepository ordemRepository)
     {
         _logger = logger;
         _transactionManager = transactionManager;
@@ -32,7 +29,6 @@ public sealed class ProcessarOrdensAgendadasUseCase
         _fundoRepository = fundoRepository;
         _posicaoRepository = posicaoRepository;
         _ordemRepository = ordemRepository;
-        _operationHandlerFactory = operationHandlerFactory;
     }
 
     public async Task<ProcessamentoResumo> ExecuteAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
@@ -74,13 +70,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
 
                     try
                     {
-                        if (ordem.TipoOperacao == TipoOperacao.RESGATE && posicao is null)
-                        {
-                            throw new BusinessRuleException("Cotas insuficientes para realizar o resgate.");
-                        }
-
-                        var handler = _operationHandlerFactory.Get(ordem.TipoOperacao);
-                        handler.Process(ordem, cliente, fundo, posicao, agora);
+                        ordem.Processar(cliente, fundo, posicao, agora);
                         processadas++;
 
                         _logger.LogInformation(
@@ -90,8 +80,7 @@ public sealed class ProcessarOrdensAgendadasUseCase
                     }
                     catch (BusinessRuleException ex)
                     {
-                        ordem.Status = StatusOrdem.REJEITADA;
-                        ordem.DataProcessamento = agora;
+                        ordem.Rejeitar(agora);
                         rejeitadas++;
 
                         _logger.LogWarning(
