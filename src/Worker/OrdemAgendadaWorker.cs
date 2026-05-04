@@ -1,6 +1,6 @@
 using CaseGig.Application.UseCases;
 
-namespace CaseGig.Api.BackgroundJobs;
+namespace CaseGig.Worker;
 
 public sealed class OrdemAgendadaWorker : BackgroundService
 {
