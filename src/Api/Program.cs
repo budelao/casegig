@@ -1,4 +1,3 @@
-using CaseGig.Api.BackgroundJobs;
 using CaseGig.Api.Configuration;
 using CaseGig.Application;
 using CaseGig.Domain.Services;
@@ -19,7 +18,6 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<OrdemService>();
 builder.Services.AddScoped<OrdemProcessamentoService>();
-builder.Services.AddHostedService<OrdemAgendadaWorker>();
 
 var app = builder.Build();
 
