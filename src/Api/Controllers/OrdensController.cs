@@ -84,7 +84,7 @@ public sealed class OrdensController : ControllerBase
         if (errors.Count > 0)
         {
             _logger.LogWarning(
-                "Falha de validação no request de criação de ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} DataAgendamento={DataAgendamento} ErrorsCount={ErrorsCount}",
+                "Falha de validação no request de criação de ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} DataAgendamento={DataAgendamento:dd/MM/yyyy} ErrorsCount={ErrorsCount}",
                 request.IdCliente,
                 request.IdFundo,
                 request.TipoOperacao,
@@ -94,7 +94,7 @@ public sealed class OrdensController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Criando ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} Data={DataAgendamento}",
+            "Criando ordem AGENDADA. Cliente={IdCliente} Fundo={IdFundo} Tipo={TipoOperacao} Data={DataAgendamento:dd/MM/yyyy}",
             request.IdCliente,
             request.IdFundo,
             request.TipoOperacao,
