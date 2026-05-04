@@ -1,4 +1,4 @@
-using CaseGig.Api.Middleware;
+using CaseGig.Api.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Text.Encodings.Web;
 using System.Threading.Channels;
 
-namespace CaseGig.Api.Observability;
+namespace CaseGig.Api.BackgroundJobs;
 
 internal sealed class ObservabilityExportQueue
 {
@@ -263,7 +263,10 @@ internal sealed class ObservabilityExportLoggerProvider : ILoggerProvider, ISupp
 
         private static string GetSourceFromCategory(string category)
         {
-            if (category.Contains(".Workers.", StringComparison.Ordinal) || category.Contains(".Workers", StringComparison.Ordinal))
+            if (category.Contains(".BackgroundJobs.", StringComparison.Ordinal)
+                || category.Contains(".BackgroundJobs", StringComparison.Ordinal)
+                || category.Contains(".Workers.", StringComparison.Ordinal)
+                || category.Contains(".Workers", StringComparison.Ordinal))
             {
                 return "WORKER";
             }

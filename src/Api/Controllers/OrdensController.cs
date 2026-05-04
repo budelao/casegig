@@ -1,4 +1,5 @@
-using CaseGig.Api.Contracts;
+using CaseGig.Api.Models.Requests;
+using CaseGig.Api.Models.Responses;
 using CaseGig.Application.DTOs;
 using CaseGig.Application.UseCases;
 using CaseGig.Domain.Enums;

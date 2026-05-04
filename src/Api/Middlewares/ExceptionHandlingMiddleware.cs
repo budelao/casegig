@@ -1,11 +1,11 @@
-using CaseGig.Api.Contracts;
+using CaseGig.Api.Models.Responses;
 using CaseGig.Application.Exceptions;
 using CaseGig.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using System.Net;
 
-namespace CaseGig.Api.Middleware;
+namespace CaseGig.Api.Middlewares;
 
 public sealed class ExceptionHandlingMiddleware
 {

@@ -1,4 +1,4 @@
-namespace CaseGig.Api.Contracts;
+namespace CaseGig.Api.Models.Responses;
 
 public sealed class ApiResponse<T>
 {

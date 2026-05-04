@@ -1,13 +1,12 @@
-using CaseGig.Api.Logging;
-using Microsoft.Extensions.Logging.Console;
+using CaseGig.Api.Common.Logging;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace CaseGig.Api.Extensions;
+namespace CaseGig.Api.Configuration;
 
-internal static class LoggingExtensions
+internal static class LoggingConfiguration
 {
-    public static WebApplicationBuilder ConfigureConsoleLogging(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddLoggingConfiguration(this WebApplicationBuilder builder)
     {
         var consoleFormatterName = builder.Configuration.GetValue<string>("Logging:Console:FormatterName");
         if (string.IsNullOrWhiteSpace(consoleFormatterName))
@@ -57,4 +56,3 @@ internal static class LoggingExtensions
         return builder;
     }
 }
-

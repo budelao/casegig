@@ -1,6 +1,6 @@
 using CaseGig.Domain.Enums;
 
-namespace CaseGig.Api.Contracts;
+namespace CaseGig.Api.Models.Requests;
 
 public sealed record CriarOrdemAgendamentoRequest(
     Guid IdCliente,
