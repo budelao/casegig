@@ -47,7 +47,7 @@ public sealed class OrdemAgendadaWorker : BackgroundService
 
         using var logScope = _logger.BeginScope(new Dictionary<string, object> { ["Source"] = "WORKER" });
         var agora = DateTime.Now;
-        _logger.LogInformation("Ciclo iniciado. Agora={Agora:dd/MM/yyyy HH:mm:ss} BatchSize={BatchSize}", agora, _batchSize);
+        _logger.LogInformation("Ciclo iniciado. DataReferencia={DataReferencia:dd/MM/yyyy} Agora={Agora:dd/MM/yyyy HH:mm:ss} BatchSize={BatchSize}", agora.Date, agora, _batchSize);
         var resumo = await useCase.ExecuteAsync(agora, _batchSize, stoppingToken);
         if (resumo.Encontradas == 0)
         {

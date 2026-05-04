@@ -49,6 +49,6 @@ public sealed class Fundo
 
     public DateTime CalcularDataExecucao(DateOnly dataAgendamento)
     {
-        return dataAgendamento.ToDateTime(TimeOnly.FromTimeSpan(HorarioCorte));
+        return dataAgendamento.ToDateTime(TimeOnly.FromTimeSpan(HorarioCorte), DateTimeKind.Local);
     }
 }

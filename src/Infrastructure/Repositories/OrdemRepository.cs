@@ -51,8 +51,10 @@ public sealed class OrdemRepository : IOrdemRepository
 
     public async Task<IReadOnlyList<Ordem>> ListAgendadasParaProcessarAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
     {
+        var inicio = agora.Date;
+        var fim = inicio.AddDays(1);
         return await _dbContext.Ordens
-            .Where(x => x.Status == StatusOrdem.AGENDADA && x.DataAgendamento != null && x.DataAgendamento <= agora)
+            .Where(x => x.Status == StatusOrdem.AGENDADA && x.DataAgendamento != null && x.DataAgendamento >= inicio && x.DataAgendamento < fim)
             .OrderBy(x => x.DataAgendamento)
             .ThenBy(x => x.DataCriacao)
             .Take(maximo)
