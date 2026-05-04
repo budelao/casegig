@@ -1130,8 +1130,10 @@ internal sealed class InMemoryOrdemRepository : IOrdemRepository
 
     public Task<IReadOnlyList<Ordem>> ListAgendadasParaProcessarAsync(DateTime agora, int maximo, CancellationToken cancellationToken)
     {
+        var inicio = agora.Date;
+        var fim = inicio.AddDays(1);
         IReadOnlyList<Ordem> result = Items
-            .Where(x => x.Status == StatusOrdem.AGENDADA && x.DataAgendamento.HasValue && x.DataAgendamento.Value <= agora)
+            .Where(x => x.Status == StatusOrdem.AGENDADA && x.DataAgendamento.HasValue && x.DataAgendamento.Value >= inicio && x.DataAgendamento.Value < fim)
             .OrderBy(x => x.DataAgendamento)
             .Take(maximo)
             .ToList();
