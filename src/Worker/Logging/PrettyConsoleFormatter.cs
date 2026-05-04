@@ -4,12 +4,11 @@ using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 
-namespace CaseGig.Api.Common.Logging;
+namespace CaseGig.Worker.Logging;
 
 internal sealed class PrettyConsoleFormatterOptions : ConsoleFormatterOptions
 {
-    public ConsoleColor WorkerColor { get; set; } = ConsoleColor.Yellow;
-    public ConsoleColor ApiColor { get; set; } = ConsoleColor.Green;
+    public ConsoleColor BaseColor { get; set; } = ConsoleColor.Yellow;
     public bool UseColors { get; set; } = !Console.IsOutputRedirected;
     public string ColorMode { get; set; } = "console";
 }
@@ -34,39 +33,12 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
             return;
         }
 
-        string? sourceFromScope = null;
-        if (_options.IncludeScopes && scopeProvider is not null)
-        {
-            scopeProvider.ForEachScope(
-                (scope, _) =>
-                {
-                    if (sourceFromScope is not null)
-                    {
-                        return;
-                    }
-
-                    if (scope is IEnumerable<KeyValuePair<string, object?>> scopeValues)
-                    {
-                        foreach (var kvp in scopeValues)
-                        {
-                            if (string.Equals(kvp.Key, "Source", StringComparison.OrdinalIgnoreCase) && kvp.Value is string s && !string.IsNullOrWhiteSpace(s))
-                            {
-                                sourceFromScope = s;
-                                return;
-                            }
-                        }
-                    }
-                },
-                state: (object?)null);
-        }
-
-        var source = NormalizeSource(sourceFromScope) ?? GetSourceFromCategory(logEntry.Category);
         var now = _options.UseUtcTimestamp ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
         var timestampFormat = string.IsNullOrWhiteSpace(_options.TimestampFormat) ? "HH:mm:ss.fff" : _options.TimestampFormat;
         var timestamp = now.ToString(timestampFormat, CultureInfo.InvariantCulture);
         var level = GetLevelToken(logEntry.LogLevel);
 
-        var line = $"{timestamp} {level} {source} {message}";
+        var line = $"{timestamp} {level} WORKER {message}";
         var exceptionText = logEntry.Exception?.ToString();
 
         if (!_options.UseColors)
@@ -81,7 +53,7 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
 
         if (string.Equals(_options.ColorMode, "ansi", StringComparison.OrdinalIgnoreCase))
         {
-            var ansiColor = GetAnsiColorCode(source, logEntry.LogLevel);
+            var ansiColor = GetAnsiColorCode(logEntry.LogLevel);
             textWriter.Write("\u001b[");
             textWriter.Write(ansiColor);
             textWriter.Write("m");
@@ -96,7 +68,7 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
             return;
         }
 
-        var color = GetColor(source, logEntry.LogLevel);
+        var color = GetColor(logEntry.LogLevel);
         lock (ConsoleLock)
         {
             var originalColor = Console.ForegroundColor;
@@ -117,7 +89,7 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
         }
     }
 
-    private ConsoleColor GetColor(string source, LogLevel level)
+    private ConsoleColor GetColor(LogLevel level)
     {
         if (level >= LogLevel.Error)
         {
@@ -129,15 +101,10 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
             return ConsoleColor.DarkYellow;
         }
 
-        if (string.Equals(source, "WORKER", StringComparison.OrdinalIgnoreCase))
-        {
-            return _options.WorkerColor;
-        }
-
-        return _options.ApiColor;
+        return _options.BaseColor;
     }
 
-    private static string GetAnsiColorCode(string source, LogLevel level)
+    private static string GetAnsiColorCode(LogLevel level)
     {
         if (level >= LogLevel.Error)
         {
@@ -149,12 +116,7 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
             return "33";
         }
 
-        if (string.Equals(source, "WORKER", StringComparison.OrdinalIgnoreCase))
-        {
-            return "33";
-        }
-
-        return "32";
+        return "33";
     }
 
     private static string GetLevelToken(LogLevel level)
@@ -169,30 +131,5 @@ internal sealed class PrettyConsoleFormatter : ConsoleFormatter
             LogLevel.Critical => "CRT",
             _ => "UNK"
         };
-    }
-
-    private static string GetSourceFromCategory(string category)
-    {
-        return "API";
-    }
-
-    private static string? NormalizeSource(string? source)
-    {
-        if (string.IsNullOrWhiteSpace(source))
-        {
-            return null;
-        }
-
-        if (string.Equals(source, "WORKER", StringComparison.OrdinalIgnoreCase))
-        {
-            return "WORKER";
-        }
-
-        if (string.Equals(source, "API", StringComparison.OrdinalIgnoreCase))
-        {
-            return "API";
-        }
-
-        return source;
     }
 }

@@ -4,7 +4,7 @@ API REST para criação e processamento de ordens de investimento em fundos, com
 
 - Validação de regras de negócio (saldo, posição, mínimos, fundo ABERTO/FECHADO)
 - Regra de cut-off por fundo (ordens após o horário são AGENDADAS)
-- Processamento assíncrono de ordens AGENDADAS via HostedService
+- Processamento assíncrono de ordens AGENDADAS via Worker Service (projeto separado)
 - Persistência com EF Core + MySQL, com controle de concorrência (RowVersion)
 
 ## Tecnologias
@@ -76,6 +76,12 @@ dotnet run --project ./src/Api/CaseGig.Api.csproj
 ```
 
 Em ambiente `Development`, a API tenta aplicar migrations automaticamente no startup.
+
+Rodar o Worker (processamento de ordens agendadas):
+
+```bash
+dotnet run --project ./src/Worker/CaseGig.Worker.csproj
+```
 
 ## Endpoints
 
@@ -167,19 +173,22 @@ Com `ASPNETCORE_ENVIRONMENT=Development`, o Swagger UI fica em:
 
 ## Worker (ordens agendadas)
 
-O worker (`HostedService`) processa periodicamente ordens elegíveis:
+O processamento de ordens agendadas roda em um **projeto separado** (`CaseGig.Worker`), para permitir deploy e escalabilidade independentes da API.
+
+O worker processa periodicamente ordens elegíveis:
 
 - `Status = AGENDADA`
 - `DataAgendamento <= agora`
 
-Configurações em `appsettings.json`:
+Configurações (no `appsettings.json` do worker ou via variáveis de ambiente):
 
 - `Worker:IntervalSeconds` (default 30)
 - `Worker:BatchSize` (default 20)
 
 ## Arquitetura
 
-- **Api**: Controllers, middlewares, worker
+- **Api**: Controllers e middlewares (entrada HTTP)
+- **Worker**: BackgroundService para processar ordens agendadas (processo separado)
 - **Application**: UseCases e contratos (abstrações de repositório/transaction)
 - **Domain**: Entidades, enums e regras de negócio (serviços de domínio)
 - **Infrastructure**: EF Core (DbContext, migrations) e repositórios

@@ -263,14 +263,6 @@ internal sealed class ObservabilityExportLoggerProvider : ILoggerProvider, ISupp
 
         private static string GetSourceFromCategory(string category)
         {
-            if (category.Contains(".BackgroundJobs.", StringComparison.Ordinal)
-                || category.Contains(".BackgroundJobs", StringComparison.Ordinal)
-                || category.Contains(".Workers.", StringComparison.Ordinal)
-                || category.Contains(".Workers", StringComparison.Ordinal))
-            {
-                return "WORKER";
-            }
-
             return "API";
         }
 
