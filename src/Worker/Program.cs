@@ -36,6 +36,8 @@ builder.Logging.AddConsoleFormatter<PrettyConsoleFormatter, PrettyConsoleFormatt
     options.ColorMode = colorMode;
 });
 
+builder.Services.AddObservabilityExporting(builder.Configuration, builder.Logging);
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
