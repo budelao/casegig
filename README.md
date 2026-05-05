@@ -218,6 +218,10 @@ O seed inicial é criado via migrations e inclui:
 
 ![DER](desenhos/DER.png)
 
+### Fluxo de uma Ordem
+
+![DER](desenhos/FluxoOrdem.png)
+
 ## Decisões técnicas e trade-offs
 
 - Banco relacional (MySQL) + EF Core para ACID e consistência
