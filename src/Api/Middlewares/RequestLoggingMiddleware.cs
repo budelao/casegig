@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using CaseGig.Api.Configuration;
+using CaseGig.Infrastructure.Observability;
 
 namespace CaseGig.Api.Middlewares;
 
