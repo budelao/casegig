@@ -254,7 +254,7 @@ Existe estrutura de configuração para exportação (quando habilitado) para:
 - Grafana Loki (LokiEndpoint/Token)
 - Datadog (Site/ApiKey)
 
-Além da saída no console/terminal, a API/worker pode enviar logs estruturados via HTTP para as integrações configuradas.
+Além da saída no console/terminal, a API pode enviar logs estruturados via HTTP para as integrações configuradas.
 
 #### Export de logs (HTTP) + Polly
 
@@ -268,6 +268,7 @@ Quando uma integração está habilitada e com credenciais válidas (sem `CHANGE
 
 Chaves (em `appsettings.json` / variáveis de ambiente):
 
+- `Observability:Logging:Enabled` (master switch)
 - `Observability:Logging:Export:Splunk:Enabled`, `HecEndpoint`, `Token`
 - `Observability:Logging:Export:Grafana:Enabled`, `LokiEndpoint`, `Token`
 - `Observability:Logging:Export:Datadog:Enabled`, `Site`, `ApiKey`
