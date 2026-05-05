@@ -1,243 +1,231 @@
 # Software Design Document (SDD)
-## Sistema de Gestão de Ordens de Investimento
+## CaseGig — API + Worker para Ordens de Investimento (Aporte/Resgate)
 
 ---
 
 # 1. Visão Geral
 
-Este documento descreve a solução proposta para o gerenciamento de ordens de aplicação e resgate em fundos de investimento.
+Este documento descreve a solução atual do CaseGig para criação e processamento de ordens de investimento em fundos.
 
-O sistema permite:
-- Criação de ordens de aplicação e resgate
-- Validação de saldo e posição do cliente
-- Controle de horários de cut-off por fundo
-- Agendamento de ordens fora do horário permitido
-- Processamento posterior de ordens agendadas
-
-O domínio exige alto nível de consistência, controle de concorrência e integridade financeira.
+O sistema oferece:
+- Criação de ordens imediatas (APORTE/RESGATE) respeitando regras do fundo e do cliente
+- Criação de ordens agendadas (data futura e dia útil)
+- Processamento assíncrono das ordens agendadas via Worker (processo separado)
+- Persistência transacional com EF Core (MySQL) e controle de concorrência (RowVersion)
+- Idempotência nos endpoints `POST` para suportar retries sem duplicar ordens
+- Logs estruturados com export opcional (Splunk/Loki/Datadog) conforme configuração
 
 ---
 
 # 2. Arquitetura da Solução
 
-A solução foi construída utilizando arquitetura em camadas, com separação clara de responsabilidades:
+## 2.1 Estrutura (Clean Architecture)
 
-- API: exposição de endpoints REST
-- Application: orquestração de casos de uso
-- Domain: regras de negócio e entidades
-- Infrastructure: persistência e integração com banco de dados
+Projetos:
+- `CaseGig.Api`: entrada HTTP (Controllers/Middlewares) e composição do host
+- `CaseGig.Worker`: processamento em background (HostedService) e composição do host
+- `CaseGig.Application`: casos de uso, DTOs e contratos (abstrações)
+- `CaseGig.Domain`: entidades, enums e regras de negócio (DDD rico)
+- `CaseGig.Infrastructure`: persistência (EF Core), repositórios, transações e componentes técnicos (ex.: export de observabilidade)
 
-## Decisões principais
+Regras de dependência:
+- Domain não depende de nenhuma camada
+- Application depende apenas de Domain
+- Infrastructure depende de Domain e de interfaces da Application
+- API/Worker dependem de Application + Infrastructure (somente composição e orquestração)
 
-- Uso de .NET 8
-- API REST
-- Banco de dados relacional
-- EF Core como ORM
-- Background Worker (HostedService) para processamento assíncrono de ordens agendadas
+## 2.2 Decisão de modelagem (DDD rico)
 
-## Justificativa
-
-Optou-se por uma arquitetura simples, porém robusta, visando:
-- Facilidade de entendimento e execução do case
-- Clareza na separação de responsabilidades
-- Possibilidade de evolução futura
+O modelo de domínio é behavior-driven:
+- Entidades possuem métodos que aplicam invariantes e regras
+- A Application coordena fluxo, transação, repositórios e concerns técnicos (ex.: idempotência)
+- Regras de negócio não ficam espalhadas em handlers procedurais
 
 ---
 
 # 3. Modelagem de Domínio
 
-## Entidades principais
+## 3.1 Enums
+
+- `TipoOperacao`: `APORTE`, `RESGATE`
+- `StatusCaptacao`: `ABERTO`, `FECHADO`
+- `StatusOrdem`: `CRIADA`, `AGENDADA`, `EM_PROCESSAMENTO`, `CONCLUIDA`, `CANCELADA`, `REJEITADA`
+
+## 3.2 Entidades e responsabilidades
 
 ### Cliente
-- Id
-- Nome
-- Saldo
+Principais dados:
+- `IdCliente`, `Cpf`, `Nome`, `SaldoDisponivel`, `RowVersion`
+
+Comportamentos:
+- Criação de ordens imediatas e agendadas:
+  - valida fundo aberto e cut-off (quando imediato)
+  - valida saldo/cotas (conforme tipo)
+  - valida permanência mínima após resgate
 
 ### Fundo
-- Id
-- Nome
-- HorarioCutoff
+Principais dados:
+- `IdFundo`, `Nome`, `HorarioCorte`, `ValorCota`, `ValorMinimoAporte`, `ValorMinimoPermanencia`, `StatusCaptacao`, `RowVersion`
 
-### Ordem
-- Id
-- ClienteId
-- FundoId
-- Tipo (Aplicacao | Resgate)
-- Valor
-- Status (Criada | Agendada | Processada | Rejeitada)
-- DataCriacao
-- DataExecucao
+Comportamentos:
+- Validar se está aberto para operações
+- Validar se operação imediata está dentro do cut-off
+- Validar data de agendamento (futura e dia útil)
+- Calcular data/hora de execução a partir de `DateOnly` + `HorarioCorte`
+
+Observação do case:
+- `ValorMinimoAporte` e `ValorMinimoPermanencia` são aplicados sobre a quantidade de cotas (regra do case), mesmo que os nomes sugiram “valor monetário”.
 
 ### Posicao
-- Id
-- ClienteId
-- FundoId
-- Quantidade
+Principais dados:
+- Chave composta: (`IdCliente`, `IdFundo`)
+- `QuantidadeCotas`, `RowVersion`
+
+Comportamentos:
+- `CreditarCotas(...)`
+- `DebitarCotas(...)`
+
+### Ordem
+Principais dados:
+- `IdOrdem`, `IdCliente`, `IdFundo`, `TipoOperacao`, `QuantidadeCotas`
+- `DataCriacao`, `DataAgendamento?`, `DataProcessamento?`
+- `Status`, `RowVersion`
+
+Comportamentos:
+- `Agendar(...)`: define `Status=AGENDADA` e `DataAgendamento`
+- `PrepararParaProcessamento(...)`: valida status e elegibilidade por data
+- `Processar(...)`: executa APORTE/RESGATE aplicando regras e altera saldo/posição
+- `Concluir(...)` / `Rejeitar(...)`: transições finais e timestamp
 
 ---
 
 # 4. Fluxos Principais
 
-## 4.1 Aplicação
+## 4.1 Criar Ordem (imediata)
 
-1. Receber requisição
-2. Validar saldo do cliente
-3. Verificar horário de cut-off
-4. Se dentro do horário:
-   - Processar imediatamente
-5. Se fora do horário:
-   - Agendar ordem
-6. Atualizar saldo e posição
-7. Persistir dados
+1) API recebe requisição `POST /ordens`
+2) UseCase carrega cliente/fundo/posição e coordena transação
+3) Domínio cria a ordem (`Cliente.CriarOrdemImediata`) e processa (`Ordem.Processar`)
+4) Persistência grava alterações (ordem, saldo e posição)
+5) Retorna `201` (ou `200` em replay de idempotência)
 
----
+Regras aplicadas:
+- Fundo deve estar `ABERTO`
+- Operação imediata deve estar dentro do cut-off do fundo
+- APORTE: saldo suficiente e quantidade mínima de cotas
+- RESGATE: cotas suficientes e permanência mínima (cotas restantes)
 
-## 4.2 Resgate
+## 4.2 Criar Ordem (agendada)
 
-1. Receber requisição
-2. Validar posição do cliente
-3. Verificar horário de cut-off
-4. Se dentro do horário:
-   - Processar imediatamente
-5. Se fora do horário:
-   - Agendar ordem
-6. Atualizar posição e saldo
-7. Persistir dados
+1) API recebe `POST /ordens/agendamento` com `dataAgendamento` (date-only)
+2) UseCase valida idempotência, coordena transação e chama domínio
+3) Domínio valida data futura e dia útil; cria ordem e agenda com `HorarioCorte`
+4) Persistência grava a ordem com `Status=AGENDADA` e `DataAgendamento` (datetime)
+5) Retorna `201` (ou `200` em replay de idempotência)
 
----
+## 4.3 Processar Ordens Agendadas (Worker)
 
-## 4.3 Processamento de Ordens Agendadas
-
-1. Background Worker executa periodicamente
-2. Busca ordens com status "Agendada"
-3. Executa validações novamente
-4. Processa ordem
-5. Atualiza saldo e posição
-6. Atualiza status para "Processada"
+1) Worker executa periodicamente (intervalo configurável)
+2) Busca ordens elegíveis:
+- `Status=AGENDADA`
+- `DataAgendamento` dentro do dia de referência do worker (00:00 <= DataAgendamento < 00:00 do dia seguinte)
+3) Para cada ordem:
+- chama `Ordem.Processar(...)` com cliente/fundo/posição
+- em violação de regra: `Ordem.Rejeitar(...)`
+- em concorrência: registra conflito e segue
 
 ---
 
-# 5. Regras de Negócio
+# 5. Persistência, Transações e Concorrência
 
-## Aplicação
-- Cliente deve possuir saldo suficiente
+## 5.1 Banco e ORM
 
-## Resgate
-- Cliente não pode resgatar mais do que possui
+- Banco relacional (MySQL) com EF Core
+- Tabelas principais: `Clientes`, `Fundos`, `Posicoes`, `Ordens`
 
-## Cut-off
-- Cada fundo possui horário limite
-- Ordens fora do horário são agendadas
+## 5.2 Transações
 
-## Agendamento
-- Execução no próximo dia útil
+- A Application coordena transações via abstração (`ITransactionManager`)
+- Alterações de ordem/saldo/posição são persistidas de forma consistente
 
-## Consistência
-- Todas as operações devem ser transacionais
+## 5.3 Concorrência (otimista)
 
-## Concorrência
-- O sistema deve impedir inconsistências em operações simultâneas
+- Entidades possuem `RowVersion` como token de concorrência
+- Conflitos são tratados como condição normal em cenários concorrentes
 
----
+## 5.4 Idempotência (concern técnico)
 
-# 6. Decisões Técnicas
+- Endpoints `POST` aceitam `Idempotency-Key`
+- A Application calcula hash do payload e aplica semântica:
+  - mesma key + mesmo payload → replay (sem duplicar ordem)
+  - mesma key + payload diferente → `409 Conflict`
 
-## Persistência
-- Banco relacional
-- EF Core
-
-## Transações
-- Uso de transações para garantir atomicidade
-
-## Concorrência
-- Controle otimista utilizando RowVersion
-- Tratamento de conflitos
-
-## Background Processing
-- HostedService para execução de tarefas agendadas
-
-## Observabilidade
-- Logs estruturados
-- Tratamento de erros
+Persistência:
+- Metadados de idempotência são gravados em `Ordens` via shadow properties no EF Core
+- Índice único: (`IdCliente`, `IdempotencyOperation`, `IdempotencyKey`)
 
 ---
 
-# 7. Estratégias Críticas
+# 6. Observabilidade (Logs Estruturados + Export)
 
-## Consistência de Dados
-- Operações críticas executadas dentro de transações
+## 6.1 Logs locais
 
-## Concorrência
-- Uso de controle otimista
-- Garantia de integridade em cenários simultâneos
+- Saída em console (API: pretty em Development e JSON em não-Development; Worker: pretty para leitura local)
+- API inclui middleware de logging de request (CorrelationId e métricas de tempo)
 
-## Processamento Assíncrono
-- Separação entre criação e execução de ordens agendadas
+## 6.2 Export (Splunk / Grafana Loki / Datadog)
+
+- API e Worker podem exportar logs via HTTP quando habilitado
+- O export é feito em background para não bloquear request/worker
+
+Configuração:
+- `Observability:Logging:Enabled` (master switch)
+- `Observability:Logging:Export:{Target}:Enabled` + credenciais/endpoint por destino
+
+Resiliência:
+- HttpClients com Polly (timeout, retry com backoff+jitter, circuit breaker)
+
+---
+
+# 7. Datas, Cultura e Timezone
+
+- Entrada/saída humana usa pt-BR (`dd/MM/yyyy`) na borda (API)
+- O domínio trabalha com `DateOnly` (agendamento) e `DateTime` (execução)
+- O banco persiste datas como `datetime`
+- O Worker usa “dia de referência” derivado do relógio do processo (hoje)
+
+Observação:
+- Em produção, a política de timezone deve ser explicitada (ex.: `America/Sao_Paulo` ou UTC + conversão na borda).
 
 ---
 
 # 8. Trade-offs
 
-## Não utilização de mensageria (SQS/Kafka)
-
-Motivo:
-- Evitar complexidade desnecessária para o escopo do case
-- Priorizar clareza e entrega funcional
-
-Impacto:
-- Menor desacoplamento
-- Menor escalabilidade imediata
+- Não uso de mensageria no escopo do case (SQS/Kafka):
+  - reduz complexidade e facilita execução local
+  - limita escala e desacoplamento imediato
+- Uso de Worker ao invés de arquitetura distribuída:
+  - simples e suficiente para o case
+  - roadmap previsto para evolução event-driven
 
 ---
 
-## Não utilização de AWS Lambda
+# 9. Evolução para AWS (Lambda + SQS + EventBridge)
 
-Motivo:
-- Simplificação da execução local e avaliação do código
-- Foco em lógica de negócio e consistência
-
----
-
-## Uso de Background Worker ao invés de arquitetura distribuída
-
-Motivo:
-- Simplicidade
-- Facilidade de execução
+Evolução sugerida, sem reescrever regras de negócio:
+1) Introduzir interface de publicação de eventos na Application (ex.: `IEventBus`)
+2) Publicar eventos de domínio/aplicação (ex.: `OrdemAgendadaCriada`, `OrdemCriada`)
+3) EventBridge roteia eventos por tipo
+4) SQS como buffer (com DLQ)
+5) Lambda consumer processa mensagens e chama a mesma camada Application/Domain
+6) Reforçar idempotência no consumo (at-least-once controlado)
 
 ---
 
-# 9. Evolução Futura
+# 10. Conclusão
 
-A solução pode evoluir para:
-
-- Arquitetura orientada a eventos
-- Uso de mensageria (SQS ou Kafka)
-- Processamento com AWS Lambda
-- Separação em microserviços
-- Escalabilidade horizontal
-- Monitoramento avançado
-
----
-
-# 10. Uso de Inteligência Artificial
-
-A Inteligência Artificial foi utilizada como ferramenta de apoio para:
-
-- Geração de estrutura inicial do projeto
-- Sugestão de organização arquitetural
-- Apoio na criação de código boilerplate
-
-As decisões de arquitetura, modelagem e regras de negócio foram conduzidas de forma consciente, garantindo aderência aos requisitos do problema.
-
----
-
-# 11. Conclusão
-
-A solução proposta atende aos requisitos funcionais e não funcionais do problema, garantindo:
-
-- Consistência dos dados
-- Controle de concorrência
-- Clareza arquitetural
-- Facilidade de evolução
-
-A abordagem adotada equilibra simplicidade e robustez, permitindo evolução futura para cenários mais complexos.
+A solução equilibra simplicidade e robustez:
+- Regras de negócio concentradas no domínio (DDD rico)
+- Camadas com responsabilidades claras (Clean Architecture)
+- Processamento assíncrono via Worker e evolução planejada para event-driven
+- Idempotência, transações, concorrência e observabilidade tratados como concerns técnicos, com implementação consistente para API e Worker
