@@ -14,7 +14,6 @@ var builder = WebApplication.CreateBuilder(args);
 var recreateDb = args.Any(x => string.Equals(x, "--recreate-db", StringComparison.OrdinalIgnoreCase));
 builder.AddLoggingConfiguration();
 builder.AddObservabilityConfiguration();
-builder.AddResilienceConfiguration();
 builder.AddApiConfiguration();
 builder.AddSwaggerConfiguration();
 

@@ -1,10 +1,10 @@
-namespace CaseGig.Api.Configuration;
+namespace CaseGig.Infrastructure.Observability;
 
 public sealed class ObservabilityLoggingOptions
 {
     public bool Enabled { get; set; } = true;
     public bool AddCorrelationIdHeader { get; set; } = true;
-    public string ServiceName { get; set; } = "CaseGig.Api";
+    public string ServiceName { get; set; } = "CaseGig";
 
     public bool LogRequestHeaders { get; set; } = false;
     public string[] RequestHeaderAllowList { get; set; } = Array.Empty<string>();

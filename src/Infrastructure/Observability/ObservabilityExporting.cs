@@ -1,13 +1,12 @@
-using CaseGig.Api.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Threading.Channels;
 
-namespace CaseGig.Api.BackgroundJobs;
+namespace CaseGig.Infrastructure.Observability;
 
 internal sealed class ObservabilityExportQueue
 {
@@ -156,10 +155,6 @@ internal sealed class ObservabilityExportLoggerProvider : ILoggerProvider, ISupp
         private static bool AnyExporterEnabled(ObservabilityLoggingOptions options)
         {
             var export = options.Export;
-            if (export is null)
-            {
-                return false;
-            }
 
             var splunk = export.Splunk.Enabled
                 && !string.IsNullOrWhiteSpace(export.Splunk.HecEndpoint)
@@ -261,10 +256,7 @@ internal sealed class ObservabilityExportLoggerProvider : ILoggerProvider, ISupp
             return (scopes, sourceFromScope, serviceFromScope);
         }
 
-        private static string GetSourceFromCategory(string category)
-        {
-            return "API";
-        }
+        private static string GetSourceFromCategory(string category) => "APP";
 
         private static string? NormalizeSource(string? source)
         {
@@ -426,7 +418,7 @@ internal sealed class ObservabilityExportWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            using (_logger.BeginScope(new Dictionary<string, object?> { ["SkipExport"] = true, ["Source"] = "API" }))
+            using (_logger.BeginScope(new Dictionary<string, object?> { ["SkipExport"] = true }))
             {
                 _logger.LogWarning(ex, "Falha ao exportar logs para observabilidade");
             }

@@ -255,6 +255,7 @@ Existe estrutura de configuração para exportação (quando habilitado) para:
 - Datadog (Site/ApiKey)
 
 Além da saída no console/terminal, a API pode enviar logs estruturados via HTTP para as integrações configuradas.
+O Worker também pode enviar logs para os mesmos destinos usando a mesma seção de configuração.
 
 #### Export de logs (HTTP) + Polly
 
