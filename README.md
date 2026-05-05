@@ -14,6 +14,11 @@ API REST para criação e processamento de ordens de investimento em fundos, com
 - EF Core 8 + Pomelo (MySQL)
 - xUnit
 
+## Documentação
+
+- SDD (Software Design Document): `./docs/SDD.md`
+- Demais documentos/decisões: pasta `./docs/`
+
 ## Como executar
 
 ### Pré-requisitos
@@ -184,7 +189,7 @@ O processamento de ordens agendadas roda em um **projeto separado** (`CaseGig.Wo
 O worker processa periodicamente ordens elegíveis:
 
 - `Status = AGENDADA`
-- `DataAgendamento <= agora`
+- `DataAgendamento` dentro do dia de referência do worker (00:00 <= DataAgendamento < 00:00 do dia seguinte)
 
 Configurações (no `appsettings.json` do worker ou via variáveis de ambiente):
 
